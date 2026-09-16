@@ -1,0 +1,9 @@
+node_modules/
+*.log
+.env
+.env.*
+!.env.example
+output/
+tmp/
+tests/live-result.json
+.DS_Store

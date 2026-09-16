@@ -21,6 +21,7 @@ const ICONS = {
   check:'<path d="m5 12 4 4L19 6"/>',
   close:'<path d="m6 6 12 12M6 18 18 6"/>',
   arrow:'<path d="M5 12h14m-6-6 6 6-6 6"/>',
+  refresh:'<path d="M20 11a8 8 0 0 0-14.9-3M4 5v4h4M4 13a8 8 0 0 0 14.9 3M20 19v-4h-4"/>',
   book:'<path d="M12 5v16M12 5C8 2 4 3 2 4v15c4-2 7-1 10 2 3-3 6-4 10-2V4c-2-1-6-2-10 1z"/>',
   lock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
 };
@@ -57,6 +58,9 @@ let modalReturnFocus;
 let libraryView = { all:false, index:0, revealed:false };
 let practiceAnswers = new Map();
 let connection = { available:false, checked:false };
+let providerInfo = { provider:'unknown', selected:'auto' };
+let providerSwitching = false;
+let connectionRequest = 0;
 
 function toast(message) {
   clearTimeout(toastTimer);
@@ -84,6 +88,16 @@ function saveHistory() {
 function updateCounters() {
   $('#history-count').textContent = history.length;
   $('#library-count').textContent = library.length;
+}
+function updateProviderControls(info = providerInfo) {
+  providerInfo = {...providerInfo,...info};
+  const button = $('#provider-toggle');
+  if (!button) return;
+  const isLocal = providerInfo.provider === 'ollama';
+  button.querySelector('.provider-toggle-label').textContent = isLocal ? '切到 Codex' : '切到本地 AI';
+  button.title = isLocal ? '下一篇分析使用 Codex' : '下一篇分析使用 Ollama 本地免费模型';
+  button.classList.toggle('is-local', isLocal);
+  button.setAttribute('aria-label', isLocal ? '切换到 Codex' : '切换到本地 AI');
 }
 function updateWordCount() {
   const words = countWords(state.essay);
@@ -140,7 +154,7 @@ function renderAnalysis() {
   $('#prompt-input').readOnly = state.busy;
   $('#essay-input').readOnly = state.busy;
   $('#target-band').disabled = state.busy;
-  $$('[data-action="new"], [data-action="demo"], [data-action="history"]').forEach(button=>button.disabled=state.busy);
+  $$('[data-action="new"], [data-action="demo"], [data-action="history"], [data-action="toggle-provider"], [data-action="analyze"]').forEach(button=>button.disabled=state.busy || providerSwitching);
   renderPriorities();
   renderReview();
 }
@@ -218,13 +232,35 @@ window.addEventListener('pagehide', saveDraft);
 
 async function checkConnection() {
   const el = $('#connection-status');
+  const requestId = ++connectionRequest;
   try {
     const response = await fetch('/api/status', { signal:AbortSignal.timeout(12000) });
     if (!response.ok) throw new Error('连接不可用');
-    connection = {...await response.json(),checked:true};
+    const result = {...await response.json(),checked:true};
+    if (requestId !== connectionRequest) return;
+    connection = result;
+    updateProviderControls(connection);
     el.innerHTML = `<span class="status-dot ${connection.available?'':'offline'}"></span>${connection.available?'AI 已就绪':'AI 暂未连接'}`;
     el.title = connection.message || '';
-  } catch { connection={available:false,checked:true}; el.innerHTML='<span class="status-dot offline"></span>服务未连接'; el.title='请运行项目目录里的“启动写作工作台.cmd”'; }
+  } catch { if(requestId !== connectionRequest)return; connection={available:false,checked:true}; el.innerHTML='<span class="status-dot offline"></span>服务未连接'; el.title='请运行项目目录里的“启动写作工作台.cmd”'; }
+}
+async function toggleProvider() {
+  if (state.busy || providerSwitching) return;
+  const isLocal = providerInfo.provider === 'ollama';
+  const next = isLocal ? 'codex' : 'ollama';
+  const button = $('#provider-toggle');
+  providerSwitching = true; button.disabled = true; $('#analyze-button').disabled = true;
+  ++connectionRequest;
+  try {
+    const response = await fetch('/api/provider',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider:next})});
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || '切换 AI 模式失败。');
+    providerInfo = result; updateProviderControls(result);
+    const label = result.provider === 'ollama' ? '本地 AI' : result.provider === 'codex' ? 'Codex' : result.engine;
+    toast(`已切换到 ${label}。${result.available?'可以开始分析。':'当前模式尚未连接。'}`);
+    const el=$('#connection-status');el.innerHTML=`<span class="status-dot ${result.available?'':'offline'}"></span>${result.available?'AI 已就绪':'AI 暂未连接'}`;el.title=result.message||'';
+  } catch (error) { toast(error.message || '切换 AI 模式失败。'); }
+  finally { providerSwitching = false; button.disabled = false; renderAnalysis(); }
 }
 function showError(message) { $('#error').textContent = message; $('#error').classList.remove('hidden'); $('#error').scrollIntoView({behavior:'smooth',block:'center'}); }
 async function analyze() {
@@ -396,6 +432,7 @@ document.addEventListener('click', async event=>{
   switch(data.action){
     case 'analyze': await analyze();break;
     case 'cancel': controller?.abort('user');break;
+    case 'toggle-provider': await toggleProvider();break;
     case 'new':freshExercise();break;
     case 'demo':freshExercise(true);break;
     case 'toggle-model':state.modelOpen=!state.modelOpen;renderModel();saveDraft();break;

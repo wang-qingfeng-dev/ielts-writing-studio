@@ -154,3 +154,11 @@ test('classifies invalid model annotations as an upstream failure', async t => {
   const response = await post(base); assert.equal(response.status, 502);
   assert.equal(typeof (await response.json()).error, 'string');
 });
+test('switches the selected provider through the local-only endpoint', async t => {
+  const base = await withServer(t, { status: async () => ({ available:false, provider:'ollama', selected:'ollama', engine:'Ollama', message:'pull a model' }) });
+  const response = await fetch(`${base}/api/provider`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({provider:'ollama'}) });
+  assert.equal(response.status,200);
+  assert.equal((await response.json()).provider,'ollama');
+  const invalid = await fetch(`${base}/api/provider`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({provider:'invalid'}) });
+  assert.equal(invalid.status,400);
+});

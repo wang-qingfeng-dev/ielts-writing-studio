@@ -2,13 +2,14 @@ const DEFAULT_OLLAMA_URL = 'http://127.0.0.1:11434';
 const DEFAULT_OLLAMA_MODEL = 'qwen2.5:7b';
 const configuredTimeout = Number(process.env.AI_TIMEOUT_MS || 600000);
 const timeoutMs = Number.isFinite(configuredTimeout) ? Math.max(10000, Math.min(configuredTimeout, 900000)) : 600000;
+let runtimeProviderOverride = null;
 
 export class ProviderError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
 
 function selectedProvider() {
-  return String(process.env.AI_PROVIDER || 'auto').toLowerCase();
+  return String(runtimeProviderOverride || process.env.AI_PROVIDER || 'auto').toLowerCase();
 }
 function modelName() {
   return process.env.AI_MODEL || (selectedProvider() === 'codex' ? '当前 Codex 模型' : DEFAULT_OLLAMA_MODEL);
@@ -18,6 +19,7 @@ function compatibleUrl() { return (process.env.AI_BASE_URL || '').replace(/\/$/,
 function isConfiguredCompatible() { return Boolean(process.env.AI_BASE_URL); }
 
 async function fetchJson(url, options = {}, signal) {
+  if (signal?.aborted) throw new ProviderError(499, '本次分析已取消。');
   const controller = new AbortController();
   const abort = () => controller.abort();
   signal?.addEventListener('abort', abort, { once: true });
@@ -37,9 +39,6 @@ async function fetchJson(url, options = {}, signal) {
 async function ollamaAvailable() {
   try { const data = await fetch(`${ollamaUrl()}/api/tags`, { signal:AbortSignal.timeout(2500) }); return data.ok; } catch { return false; }
 }
-async function codexAvailable() {
-  return Boolean(process.env.IELTS_CODEX_PATH || process.env.AI_PROVIDER === 'codex');
-}
 
 export async function resolveProvider() {
   const selected = selectedProvider();
@@ -54,18 +53,30 @@ export async function resolveProvider() {
   return { kind:'codex', name:'Codex CLI（兼容旧配置）', model:'当前 Codex 模型' };
 }
 
+export function setProviderOverride(provider) {
+  const allowed = ['auto','ollama','codex','openai-compatible'];
+  if (!allowed.includes(provider)) throw new ProviderError(400, '不支持的 AI 模式。');
+  runtimeProviderOverride = provider;
+  return runtimeProviderOverride || 'auto';
+}
+export function getProviderOverride() { return runtimeProviderOverride || 'auto'; }
+
 export async function getProviderStatus() {
+  let provider;
   try {
-    const provider = await resolveProvider();
+    provider = await resolveProvider();
     if (provider.kind === 'ollama') {
       const tags = await fetchJson(`${provider.url}/api/tags`, {}, AbortSignal.timeout(2500));
       const models = Array.isArray(tags.models) ? tags.models.map(item=>item.name) : [];
-      const hasModel = models.length === 0 || models.includes(provider.model) || models.some(name=>name.split(':')[0]===provider.model.split(':')[0]);
-      return { available:hasModel, engine:`${provider.name} · ${provider.model}`, message:hasModel?'已连接本机 Ollama，可以免费分析。':`请先运行 ollama pull ${provider.model}。` };
+      const expected = provider.model.includes(':') ? provider.model : `${provider.model}:latest`;
+      const hasModel = models.some(name => (name.includes(':') ? name : `${name}:latest`) === expected);
+      return { available:hasModel, provider:provider.kind, selected:getProviderOverride(), engine:`${provider.name} · ${provider.model}`, message:hasModel?'已连接本机 Ollama，可以免费分析。':`请先运行 ollama pull ${provider.model}。` };
     }
-    if (provider.kind === 'compatible') return { available:true, engine:`${provider.name} · ${provider.model}`, message:'已配置 OpenAI 兼容接口。密钥只在服务端读取。' };
-    return { available:false, engine:provider.name, message:'未配置免费本地模型。安装 Ollama 并运行 pull 命令，或设置 AI_BASE_URL。' };
-  } catch (error) { return { available:false, engine:'AI provider', message:error.message || 'AI 服务不可用。' }; }
+    if (provider.kind === 'compatible') return { available:true, provider:provider.kind, selected:getProviderOverride(), engine:`${provider.name} · ${provider.model}`, message:'已配置 OpenAI 兼容接口。密钥只在服务端读取。' };
+    return { available:false, provider:provider.kind, selected:getProviderOverride(), engine:provider.name, message:'未配置免费本地模型。安装 Ollama 并运行 pull 命令，或设置 AI_BASE_URL。' };
+  } catch (error) {
+    return { available:false, provider:provider?.kind || 'unknown', selected:getProviderOverride(), engine:provider ? `${provider.name} · ${provider.model}` : 'AI provider', message:provider?.kind === 'ollama' ? `未连接到 Ollama。请启动本地 Ollama，并运行 ollama pull ${provider.model} 下载模型。` : error.message || 'AI 服务不可用。' };
+  }
 }
 
 function extractText(data) {

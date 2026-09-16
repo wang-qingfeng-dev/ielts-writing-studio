@@ -124,6 +124,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   letter-spacing: .4px;
 }
 .header-actions { gap: 9px; }
+.provider-toggle.is-local { color: #214d3e; background: rgba(216,229,207,.45); }
+.provider-toggle .icon { width: 15px; height: 15px; }
 .connection {
   display: inline-flex;
   align-items: center;
@@ -671,6 +673,8 @@ h1 > span { color: #7d9170; }
   .header-actions { gap: 0; }
   .header-actions .btn { min-height: 32px; padding: 7px 8px; font-size: 11px; }
   .header-actions .btn .icon { width: 14px; height: 14px; }
+  .provider-toggle-label { display: none; }
+  .provider-toggle { padding-left: 7px !important; padding-right: 7px !important; }
   .connection { display: none; }
   .page { padding: 24px 17px 0; }
   .hero { margin-bottom: 20px; }

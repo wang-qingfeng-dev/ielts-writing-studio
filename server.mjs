@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { correctionSchema, modelSchema, validateCorrection, validateModel, validateAnalysis, validateRequest, ValidationError } from './analysis-schema.mjs';
-import { resolveProvider, getProviderStatus, completeJson, ProviderError } from './provider.mjs';
+import { resolveProvider, getProviderStatus, setProviderOverride, getProviderOverride, completeJson, ProviderError } from './provider.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -48,7 +48,11 @@ export async function getCodexStatus() {
     return { available, engine: ENGINE, message: available ? '已连接当前电脑的 Codex，支持真实作文分析。' : '请先在此电脑运行 codex login，登录后刷新连接。' };
   } catch { return { available: false, engine: ENGINE, message: '未找到可用的 Codex。请安装并登录后重试。' }; }
 }
-export const getEngineStatus = getProviderStatus;
+export async function getEngineStatus() {
+  const status = await getProviderStatus();
+  if (status.provider !== 'codex') return status;
+  return { ...await getCodexStatus(), provider:'codex', selected:getProviderOverride() };
+}
 
 // Read only section names to disable configured integrations. Credentials are never parsed or logged.
 async function integrationOverrides() {
@@ -92,8 +96,8 @@ export async function analyzeWriting(input, { signal } = {}) {
   await mkdir(tempRoot, { recursive: true });
   const workDir = await mkdtemp(path.join(tempRoot, 'analysis-'));
   try {
-    const extra = await integrationOverrides();
     const provider = await resolveProvider();
+    const extra = provider.kind === 'codex' ? await integrationOverrides() : [];
     const runJob = async (name, schema, prompt, validate) => {
       const schemaPath = path.join(workDir, `${name}.schema.json`);
       const outputPath = path.join(workDir, `${name}.result.json`);
@@ -102,7 +106,7 @@ export async function analyzeWriting(input, { signal } = {}) {
       for (let attempt = 0; attempt < 2; attempt++) {
         if (provider.kind !== 'codex') {
           try {
-            return validate(await completeJson(provider, { system: SAFETY_INSTRUCTIONS, prompt: prompt + validationNote, schema, signal: controller }));
+            return validate(await completeJson(provider, { system: SAFETY_INSTRUCTIONS, prompt: prompt + validationNote, schema, signal: controller.signal }));
           } catch (error) {
             if (error instanceof ProviderError && error.status !== 502) throw error;
             if (attempt === 1) throw new HttpError(502, 'AI 返回的标注或分数未通过完整性检查，请重新分析。');
@@ -168,6 +172,7 @@ function assertLocalRequest(req) {
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2' };
 export function createServer({ analyze = analyzeWriting, status = getEngineStatus, publicDir = PUBLIC } = {}) {
   let busy = false;
+  let switching = false;
   return http.createServer(async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
@@ -176,9 +181,20 @@ export function createServer({ analyze = analyzeWriting, status = getEngineStatu
       assertLocalRequest(req);
       const url = new URL(req.url, `http://${req.headers.host}`);
       if (url.pathname === '/api/status' && req.method === 'GET') return sendJson(res, 200, await status());
+      if (url.pathname === '/api/provider' && req.method === 'GET') return sendJson(res, 200, await status());
+      if (url.pathname === '/api/provider' && req.method === 'POST') {
+        if (!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] || '')) throw new HttpError(415, '请使用 JSON 格式提交。');
+        if (busy || switching) throw new HttpError(409, '正在分析或切换 AI，请完成后再切换。');
+        switching = true;
+        try {
+          const body = await readBody(req);
+          setProviderOverride(body?.provider);
+          return sendJson(res, 200, await status());
+        } finally { switching = false; }
+      }
       if (url.pathname === '/api/analyze' && req.method === 'POST') {
         if (!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] || '')) throw new HttpError(415, '请使用 JSON 格式提交。');
-        if (busy) throw new HttpError(409, '已有一篇作文正在分析，请等待完成。');
+        if (busy || switching) throw new HttpError(409, '已有分析或 AI 切换正在进行，请等待完成。');
         busy = true;
         const controller = new AbortController();
         const onClose = () => { if (!res.writableEnded) controller.abort(); };
@@ -207,7 +223,7 @@ export function createServer({ analyze = analyzeWriting, status = getEngineStatu
       res.writeHead(200, { 'Content-Type': MIME[path.extname(resolved)] || 'application/octet-stream', 'Cache-Control': 'no-cache', 'Content-Length': content.length });
       res.end(req.method === 'HEAD' ? undefined : content);
     } catch (error) {
-      if (!res.destroyed && !res.headersSent) sendJson(res, error instanceof ValidationError ? 400 : error.status || 500, { error: error instanceof ValidationError || error instanceof HttpError ? error.message : '服务出现异常，请刷新后重试。' });
+      if (!res.destroyed && !res.headersSent) sendJson(res, error instanceof ValidationError ? 400 : error.status || 500, { error: error instanceof ValidationError || error instanceof HttpError || error instanceof ProviderError ? error.message : '服务出现异常，请刷新后重试。' });
     }
   });
 }

@@ -1,6 +1,6 @@
 # 句进 · 雅思写作工作台
 
-[English](README.md) · [下载 v0.1.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.1.0) · [更新记录](CHANGELOG.md)
+[English](README.en.md) · [下载 v0.1.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.1.0) · [更新记录](CHANGELOG.md)
 
 一个面向中文学习者的 IELTS Writing Task 2 本机学习工具。通过「我的原文 → 保留原意的精修 → 独立范文」三栏对照，把批改转化成可以复习、造句和迁移的学习卡片。
 
@@ -20,12 +20,22 @@
 
 ## 第一次使用
 
+### Windows：下载便携版
+
+1. 下载 [句进 v0.1.0 Windows x64 便携版 ZIP](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.1.0/ielts-writing-studio-v0.1.0-windows-x64.zip)。
+2. **先完整解压**到一个文件夹，不要在压缩包里直接运行。
+3. 双击解压目录中的 `Start Portable.cmd`，打开本机网页。
+
+便携版已附带 Node.js，无需单独安装 Node。**不包含 AI 模型**：打开后可以立即体验标明为示例的完整教学内容；批改自己的作文还需要配置下方任意一种 AI 服务。此下载包适用于 Windows x64。
+
+### 从源码运行（Windows / macOS / Linux）
+
 1. 安装 [Node.js 24 LTS](https://nodejs.org/)（最低 22.9）。
-2. 从 Release 下载 Source code ZIP 并解压，或克隆仓库。
+2. 从 Release 下载 **Source code (zip)** 并解压，或克隆仓库。
 3. Windows 双击 `Start Writing Studio.cmd`；也可以在项目目录运行 `npm start`。
 4. 打开 [http://127.0.0.1:4318](http://127.0.0.1:4318)。
 
-项目没有第三方运行时依赖，不需要执行 `npm install`。没有 npm 时可运行 `node --env-file-if-exists=.env server.mjs`。未连接模型也能查看有明确标记的完整示例。
+源码包不附带 Node，需按上述要求自行安装。项目没有第三方运行时依赖，不需要执行 `npm install`。没有 npm 时可运行 `node --env-file-if-exists=.env server.mjs`。未连接模型也能查看有明确标记的完整示例。
 
 ### 免费本地模型
 
@@ -50,6 +60,8 @@ OLLAMA_MODEL=qwen2.5:7b
 # AI_API_KEY=your-server-side-key
 ```
 
+若使用兼容 API，将 `AI_PROVIDER` 改为 `openai-compatible`，取消相关配置行前的 `#`，并填写所用服务的地址、模型名和密钥。本机兼容服务可能不要求密钥；在线服务是否收费、是否提供免费额度由服务商决定。
+
 `npm start` 和 Windows 启动器都会加载 `.env`；已有的系统/终端环境变量优先。Ollama 和兼容接口的模型可以分别配置，避免切换后使用错误的模型名。`AI_MODEL` 保留为旧配置的后备值。
 
 Codex 模式需要你自己安装、登录 CLI，使用你自己的账号额度。自动模式优先检查 Ollama，再使用你明确配置的 API，**不会自动转到 Codex**。下拉选择只在本次服务进程生效，重启后恢复环境配置。
@@ -68,7 +80,7 @@ v0.1.0 只支持 Task 2；不包含云同步、多人账号、Task 1 或在线�
 node --test tests/*.test.mjs
 ```
 
-GitHub Actions 在 Node 22、24 上运行测试。详细范围见 [首发验证记录](docs/release-verification-v0.1.0.md)。`tests/live-check.mjs` 是可选真实模型检查，会使用当前服务的算力或额度；模拟接口测试不能证明实际模型评分质量。
+v0.1.0 已通过 56 项自动化测试，GitHub Actions 在 Node 22、24 上运行测试。详细范围见 [首发验证记录](docs/release-verification-v0.1.0.md)。`tests/live-check.mjs` 是可选真实模型检查，会使用当前服务的算力或额度；模拟接口测试不能证明实际模型评分质量。
 
 欢迎提交问题和修复，报告时说明系统、Node 版本、所用 AI 类型和复现步骤；不要附真实 API key 或不愿公开的作文。
 

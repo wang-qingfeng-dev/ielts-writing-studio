@@ -1,13 +1,13 @@
-# Third-party boundaries
+# 第三方组件与使用边界
 
-The application source is distributed under the MIT license in LICENSE.
+本项目应用源码采用 LICENSE 中的 MIT 许可证。
 
-- Node.js is a separately installed runtime; its license is not replaced by this project's license.
-- Ollama and any downloaded model weights are separate software/artifacts governed by their own licenses. No model weights are distributed in this repository.
-- Compatible API providers and optional Codex CLI are separately configured services/software. Their account terms, quotas and privacy policies continue to apply.
-- IELTS names and scoring dimensions identify the exam being practised. The project is unaffiliated with IELTS and does not distribute official exam papers, logos or examiner scores. Links to official material are references, not a sublicense.
-- The built-in demo is illustrative learning material bundled with the app, not an official paper or validated examiner assessment.
-- The UI uses system fonts, native browser modules, inline SVG icons and a local favicon. No third-party UI package or CDN dependency is bundled.
-- GitHub Actions checkout and setup-node run only in CI and retain their own licenses.
+- Node.js 是独立运行环境；源码包需要另行安装。Windows 便携下载包包含官方 Node.js 发行文件，并保留其完整 LICENSE、说明及依赖许可信息，见包内 runtime 目录。项目 MIT 许可证不会替代这些条款。
+- Ollama 和下载的模型权重遵循各自许可证。本仓库及便携包均不附带模型权重。
+- 兼容 API 和可选 Codex CLI 属于用户自行配置的服务或软件，继续适用各自的账号条款、额度和隐私政策。
+- IELTS 名称及评分维度用于说明练习对象。本项目与 IELTS 官方无关联，不分发官方试题、标识或考官成绩。官方资料链接仅作参考，不代表转授权。
+- 内置示例是教学演示素材，不是官方试卷或经过考官验证的评估。
+- 界面使用系统字体、浏览器原生模块、内联 SVG 图标及本地 favicon，没有捆绑第三方 UI 包或 CDN 依赖。
+- GitHub Actions 的 checkout 和 setup-node 仅用于持续集成，保留各自许可证。
 
-Generated corrections, estimates and model essays may be inaccurate. Check important language and scoring judgments against qualified feedback.
+AI 修改、估分和范文可能存在错误；重要的语言和评分判断请结合合格教师的反馈。

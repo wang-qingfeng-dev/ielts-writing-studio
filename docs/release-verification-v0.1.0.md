@@ -4,11 +4,12 @@ Date: September 17, 2026. Local environment: Windows, Node.js 24.19.0.
 
 ## Automated checks
 
-`node --test tests/*.test.mjs` passed all 52 tests with no failures or skips.
+`node --test tests/*.test.mjs` passed all 56 tests with no failures or skips.
 The suite covers request validation, exact source citations, four scoring
 criteria, HTML escaping, independent model context, provider selection,
 mocked HTTP integration, cancellation, request locking, and draft/history
-preservation. The HTTP Ollama test uses a local fixture service, not model
+preservation, whole-request HTTP deadlines, response-size bounds, and actual
+connection closure on cancellation. The HTTP Ollama test uses a local fixture service, not model
 weights or real inference.
 
 `node --check` passed for the server, provider and frontend application.
@@ -44,6 +45,21 @@ API credentials, private keys, personal filesystem paths or real essay results
 were found in their tracked contents. The current release additionally ignores
 Windows shortcuts and local release artifacts. Git retains ordinary author
 attribution; no history was rewritten.
+
+## Live Codex check
+
+On September 17 at 11:59 UTC, the included synthetic transport-policy essay
+completed a real Codex analysis in 438 seconds. The response passed the
+schema, exact-source quotation and live-check assertions: 9 issues,
+7 reusable expressions and a 309-word independent model essay. The generated
+result remains in the ignored local test output; personal writing was not used.
+
+An earlier attempt exposed Node fetch's separate response-header timeout.
+The live checker now uses a transport with an explicit whole-request deadline;
+the successful run lasted longer than the old five-minute header limit.
+The transport was then shared with Ollama/compatible requests and covered by
+the final automated suite, including delayed headers and stalled bodies.
+This is one fixture check, not a benchmark of latency or assessment accuracy.
 
 ## Model quality boundary
 

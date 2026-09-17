@@ -71,7 +71,7 @@ function toast(message) {
 function saveDraft() {
   clearTimeout(saveTimer);
   const current = { id:state.id,prompt:state.prompt,essay:state.essay,targetBand:state.targetBand,analysis:state.analysis,mode:state.mode,modelOpen:state.modelOpen,createdAt:state.createdAt,analyzedAt:state.analyzedAt };
-  // Reloading during a retry must retain the last completed result.
+  // 重试期间刷新页面时，必须保留最近一次完成的结果。
   const saved = write(KEYS.draft, state.busy && analysisBackup ? { ...current, ...analysisBackup } : current);
   $('#save-state').textContent = saved ? '已自动保存到本机' : '未能保存，请导出笔记';
 }
@@ -261,7 +261,7 @@ async function switchProvider(next) {
     const el=$('#connection-status');el.innerHTML=`<span class="status-dot ${result.available?'':'offline'}"></span>${result.available?'AI 已就绪':'AI 暂未连接'}`;el.title=result.message||'';
   } catch (error) {
     toast(error.name === 'TimeoutError' ? '切换等待超时，正在重新检查当前 AI 模式。' : error.message || '切换 AI 模式失败。');
-    // The server may have accepted the change before the response was interrupted.
+    // 响应中断前，服务端可能已经接受了这次切换。
     await checkConnection();
   }
   finally { providerSwitching = false; updateProviderControls(); renderAnalysis(); }

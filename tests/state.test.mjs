@@ -5,8 +5,8 @@ import { readFileSync } from 'node:fs';
 import { DEMO_PROMPT, DEMO_ESSAY, DEMO_ANALYSIS } from '../public/demo.js';
 import { countWords } from '../public/utils.js';
 
-// Execute the shipped state transitions with small DOM/network boundaries.
-// This intentionally reads app.js rather than duplicating its persistence logic.
+// 在简化的 DOM/网络边界中执行正式状态转换。
+// 这里直接读取 app.js，避免重复实现持久化逻辑。
 const appSource = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
 const testedFunctions = ['saveDraft', 'saveHistory', 'analyze', 'freshExercise', 'clearResult', 'updateProviderControls', 'checkConnection', 'switchProvider'];
 const functionsSource = testedFunctions.map(name => {

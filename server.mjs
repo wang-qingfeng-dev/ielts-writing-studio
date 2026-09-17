@@ -54,7 +54,7 @@ export async function getEngineStatus() {
   return { ...await getCodexStatus(), provider:'codex', selected:getProviderOverride() };
 }
 
-// Read only section names to disable configured integrations. Credentials are never parsed or logged.
+// 只读取配置中的区段名称来停用集成；绝不解析或记录凭据。
 async function integrationOverrides() {
   const codexConfigPath = path.join(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'config.toml');
   let config = '';
@@ -116,7 +116,7 @@ export async function analyzeWriting(input, { signal } = {}) {
         }
         const execution = await runProcess(CODEX, makeArgs(workDir, schemaPath, outputPath, extra), { cwd: workDir, input: prompt + validationNote, signal: controller.signal });
         if (execution.code !== 0) {
-          // Avoid exposing provider responses, local paths, configuration or credentials.
+          // 避免暴露服务响应、本机路径、配置或凭据。
           const detail = execution.stderr + execution.stdout;
           if (/rate.limit|quota|insufficient_quota|429/i.test(detail)) throw new HttpError(503, '当前 AI 服务额度或调用频率受限，请稍后重试。');
           if (/401|unauthorized|authentication/i.test(detail)) throw new HttpError(503, 'AI 登录已失效，请重新运行 codex login 后重试。');

@@ -1,3 +1,5 @@
+import { requestJson } from './http-json.mjs';
+
 const DEFAULT_OLLAMA_URL = 'http://127.0.0.1:11434';
 const DEFAULT_OLLAMA_MODEL = 'qwen2.5:7b';
 const configuredTimeout = Number(process.env.AI_TIMEOUT_MS || 600000);
@@ -31,14 +33,10 @@ function isConfiguredCompatible() { return Boolean(process.env.AI_BASE_URL?.trim
 
 async function fetchJson(url, options = {}, signal) {
   if (signal?.aborted) throw new ProviderError(499, '本次分析已取消。');
-  const controller = new AbortController();
-  const abort = () => controller.abort();
-  signal?.addEventListener('abort', abort, { once: true });
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
-    let data = null; try { data = await response.json(); } catch {}
-    if (!response.ok) {
+    const response = await requestJson(url, { ...options, signal, timeoutMs });
+    const data = response.data;
+    if (response.status < 200 || response.status >= 300) {
       const message = response.status === 401 || response.status === 403
         ? 'AI 接口认证失败，请检查服务端 AI_API_KEY 和模型权限。'
         : response.status === 429
@@ -51,9 +49,11 @@ async function fetchJson(url, options = {}, signal) {
   } catch (error) {
     if (signal?.aborted) throw new ProviderError(499, '本次分析已取消。');
     if (error instanceof ProviderError) throw error;
-    if (controller.signal.aborted) throw new ProviderError(504, 'AI 接口响应超时，请稍后重试或使用更小的本地模型。');
+    if (error.code === 'ETIMEDOUT') throw new ProviderError(504, 'AI 接口响应超时，请稍后重试或使用更小的本地模型。');
+    if (error.code === 'EINVALIDJSON') throw new ProviderError(502, 'AI 接口返回的内容不是有效 JSON。');
+    if (error.code === 'ERESPONSETOOLARGE') throw new ProviderError(502, 'AI 接口返回内容超出限制，请缩短作文后重试。');
     throw new ProviderError(503, '无法连接 AI 接口，请检查服务是否启动及网络连接。');
-  } finally { clearTimeout(timer); signal?.removeEventListener('abort', abort); }
+  }
 }
 
 async function ollamaAvailable() {
@@ -73,8 +73,7 @@ export async function resolveProvider() {
   if (selected !== 'auto') throw new ProviderError(503, 'AI_PROVIDER 不受支持，请使用 auto、ollama、openai-compatible 或 codex。');
   if (await ollamaAvailable()) return localProvider();
   if (isConfiguredCompatible()) return compatibleProvider();
-  // Account-backed Codex calls require an explicit selection; a missing local
-  // service must never silently submit an essay to another provider.
+  // 账户型 Codex 调用必须明确选择；本地服务缺失时不能悄悄把作文提交给其他提供商。
   return localProvider();
 }
 
@@ -127,8 +126,7 @@ export async function completeJson(provider, { system, prompt, schema, signal })
   }
   if (provider.kind === 'compatible') {
     const url=`${provider.url}/chat/completions`;
-    // JSON mode guarantees syntax only. Include the schema in the instructions
-    // so providers without strict structured-output support know all fields.
+    // JSON 模式只能保证语法；把完整结构加入提示，兼容不支持严格结构化输出的服务。
     const instructions = `${system}\nReturn exactly one JSON object matching this JSON Schema:\n${JSON.stringify(schema)}`;
     const base={model:provider.model,messages:[{role:'system',content:instructions},{role:'user',content:prompt}],temperature:0.2};
     const headers={'Content-Type':'application/json'}; if(process.env.AI_API_KEY)headers.Authorization=`Bearer ${process.env.AI_API_KEY}`;

@@ -4,7 +4,7 @@ export const normalizeAnswer = text => String(text).trim().toLowerCase().replace
 export const formatBand = band => Number(band).toFixed(1);
 export const formatRange = score => score.low === score.high ? formatBand(score.low) : `${formatBand(score.low)}–${formatBand(score.high)}`;
 
-// Keep the unique context as an anchor, but visually mark only the changed words.
+// 保留唯一上下文作为定位锚点，但视觉上只标记发生变化的词。
 export function issueAnnotation(text, issue, side) {
   const before=[...issue.original.matchAll(/\S+/g)];
   const after=[...issue.replacement.matchAll(/\S+/g)];
@@ -23,7 +23,7 @@ export function issueAnnotation(text, issue, side) {
   return {id:issue.id,kind:'issue',category:issue.category,text:source.slice(start,end),position:anchor<0?-1:anchor+start};
 }
 
-// Split overlapping sentence/phrase highlights into adjacent buttons, never nested markup.
+// 将重叠的句子/短语高亮拆成相邻按钮，避免嵌套标记。
 export function annotate(text, entries = []) {
   const ranges = [];
   for (const entry of entries) {
@@ -50,7 +50,7 @@ export function annotate(text, entries = []) {
   const segments = [];
   for (let i=0;i<boundaries.length-1;i++) {
     const start=boundaries[i],end=boundaries[i+1];
-    // A specific phrase remains clickable inside a broader reasoning sentence.
+    // 较大的论证句中，具体短语仍然保持可点击。
     const range=ranges.filter(item=>item.start<=start && item.end>=end).sort((a,b)=>(a.end-a.start)-(b.end-b.start))[0];
     const last=segments.at(-1);
     if(last && last.range===range) last.end=end;

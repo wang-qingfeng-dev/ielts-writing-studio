@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { validateAnalysis } from '../analysis-schema.mjs';
+import { requestJson } from '../http-json.mjs';
 
 const base = process.env.IELTS_TEST_URL || 'http://127.0.0.1:4318';
 const input = {
@@ -16,10 +17,17 @@ On the other hand, charging passengers give transport companies money to improve
 In conclusion, I think public transport should be affordable but not always free. Governments should offer free travel to low-income residents and charge a reasonable fare to other users. This approach can help those in need while keeping enough money to provide a reliable service.`
 };
 const started = Date.now();
-const status = await fetch(`${base}/api/status`).then(response => response.json());
+const statusResponse = await requestJson(`${base}/api/status`, {timeoutMs:15000});
+assert.equal(statusResponse.status, 200, 'Engine status request must succeed');
+const status = statusResponse.data;
 assert.equal(status.available, true, 'Real engine must be available');
-const response = await fetch(`${base}/api/analyze`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base }, body: JSON.stringify(input), signal: AbortSignal.timeout(10 * 60 * 1000) });
-const result = await response.json();
+console.log(`Testing real ${status.provider || 'AI'} analysis; deadline: 10 minutes.`);
+const progress = setInterval(() => console.log(`Analysis still running (${Math.round((Date.now() - started) / 1000)} seconds elapsed).`), 60000);
+let response;
+try {
+  response = await requestJson(`${base}/api/analyze`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base }, body: JSON.stringify(input), timeoutMs:10 * 60 * 1000 });
+} finally { clearInterval(progress); }
+const result = response.data;
 assert.equal(response.status, 200, result.error || 'Analysis failed');
 validateAnalysis(result, input.essay);
 assert(result.issues.length >= 3, 'Known grammar issues should be detected');

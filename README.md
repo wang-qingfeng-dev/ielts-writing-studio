@@ -100,6 +100,7 @@ node tests/live-check.mjs
 | `public/` | UI, draft storage, annotations, study cards and demo data |
 | `server.mjs` | Local HTTP API, independent analysis jobs and process isolation |
 | `provider.mjs` | Ollama, compatible API and optional CLI adapters |
+| `http-json.mjs` | Bounded HTTP requests with cancellation and whole-request deadlines |
 | `analysis-schema.mjs` | JSON schemas, band boundaries and source validation |
 | `tests/` | Automated regression tests and optional live check |
 | `CONTRACT.md` | API and UI structure |

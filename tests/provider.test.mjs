@@ -47,27 +47,35 @@ async function fakeOllama(t) {
   return { state, url: `http://127.0.0.1:${server.address().port}` };
 }
 
-test('OpenAI-compatible provider keeps the API key server-side and parses JSON content', async () => {
-  const previous = { AI_PROVIDER:process.env.AI_PROVIDER, AI_BASE_URL:process.env.AI_BASE_URL, AI_API_KEY:process.env.AI_API_KEY, AI_MODEL:process.env.AI_MODEL };
-  const originalFetch = globalThis.fetch;
+async function serveJson(t, handler) {
+  const server = http.createServer(async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    res.setHeader('Content-Type', 'application/json');
+    await handler(req, res, chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : null);
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise(resolve => { server.closeAllConnections(); server.close(resolve); }));
+  return `http://127.0.0.1:${server.address().port}`;
+}
+
+test('OpenAI-compatible provider keeps the API key server-side and parses JSON content', async t => {
   let request;
-  process.env.AI_PROVIDER='openai-compatible'; process.env.AI_BASE_URL='https://example.invalid/v1'; process.env.AI_API_KEY='test-secret'; process.env.AI_MODEL='free-model';
-  globalThis.fetch = async (url, options) => { request={url,options}; return new Response(JSON.stringify({choices:[{message:{content:'```json\n{"ok":true}\n```'}}]}),{status:200,headers:{'content-type':'application/json'}}); };
-  try {
-    const schema = {type:'object',properties:{ok:{type:'boolean'}},required:['ok'],additionalProperties:false};
-    const result = await completeJson({kind:'compatible',url:'https://example.invalid/v1',model:'free-model'},{system:'system',prompt:'prompt',schema,signal:undefined});
-    assert.deepEqual(result,{ok:true});
-    assert.equal(request.url,'https://example.invalid/v1/chat/completions');
-    const body=JSON.parse(request.options.body);
-    assert.equal(body.model,'free-model');
-    assert.equal(request.options.headers.Authorization,'Bearer test-secret');
-    assert(body.messages[0].content.includes(JSON.stringify(schema)), 'JSON mode must receive the actual schema, not just its name');
-    assert(!body.messages[0].content.includes('test-secret'));
-    assert.equal(body.messages[1].content,'prompt');
-  } finally {
-    globalThis.fetch=originalFetch;
-    for(const [key,value] of Object.entries(previous)){ if(value===undefined)delete process.env[key]; else process.env[key]=value; }
-  }
+  const base = await serveJson(t, (req, res, body) => {
+    request = {url:req.url,headers:req.headers,body};
+    res.end(JSON.stringify({choices:[{message:{content:'```json\n{"ok":true}\n```'}}]}));
+  });
+  configure(t, {AI_PROVIDER:'openai-compatible',AI_BASE_URL:`${base}/v1`,AI_API_KEY:'test-secret',AI_MODEL:'free-model'});
+  const schema = {type:'object',properties:{ok:{type:'boolean'}},required:['ok'],additionalProperties:false};
+  const result = await completeJson(await resolveProvider(), {system:'system',prompt:'prompt',schema});
+  assert.deepEqual(result,{ok:true});
+  assert.equal(request.url,'/v1/chat/completions');
+  const body=request.body;
+  assert.equal(body.model,'free-model');
+  assert.equal(request.headers.authorization,'Bearer test-secret');
+  assert(body.messages[0].content.includes(JSON.stringify(schema)), 'JSON mode must receive the actual schema, not just its name');
+  assert(!body.messages[0].content.includes('test-secret'));
+  assert.equal(body.messages[1].content,'prompt');
 });
 
 test('Ollama provider status times out quickly when local service is unavailable', async () => {
@@ -198,16 +206,13 @@ test('startup status reflects the configured environment and rejects misspelled 
 });
 
 test('compatible provider retries unsupported JSON mode with the schema intact', async t => {
-  configure(t, { AI_PROVIDER: 'openai-compatible', AI_BASE_URL: 'https://example.invalid/v1', AI_MODEL: 'free-model', AI_API_KEY: undefined });
-  const originalFetch = globalThis.fetch;
-  t.after(() => { globalThis.fetch = originalFetch; });
   const requests = [];
-  globalThis.fetch = async (_url, options) => {
-    requests.push(JSON.parse(options.body));
-    return requests.length === 1
-      ? new Response('{}', {status:400})
-      : new Response(JSON.stringify({choices:[{message:{content:'{"ok":true}'}}]}), {status:200});
-  };
+  const base = await serveJson(t, (_req, res, body) => {
+    requests.push(body);
+    if (requests.length === 1) { res.writeHead(400); res.end('{}'); }
+    else res.end(JSON.stringify({choices:[{message:{content:'{"ok":true}'}}]}));
+  });
+  configure(t, { AI_PROVIDER: 'openai-compatible', AI_BASE_URL:base, AI_MODEL: 'free-model', AI_API_KEY: undefined });
   const schema = {type:'object',properties:{ok:{type:'boolean'}},required:['ok']};
   const result = await completeJson(await resolveProvider(), {system:'Return JSON.',prompt:'Essay input',schema});
   assert.deepEqual(result, {ok:true});
@@ -218,30 +223,39 @@ test('compatible provider retries unsupported JSON mode with the schema intact',
 });
 
 test('invalid provider JSON produces a safe 502 for validation retries', async t => {
-  const originalFetch = globalThis.fetch;
-  t.after(() => { globalThis.fetch = originalFetch; });
+  let responseContent;
+  const base = await serveJson(t, (_req, res) => res.end(JSON.stringify({message:{content:responseContent}})));
   for (const content of ['Here is {broken-json} with private-provider-details', 'no result']) {
-    globalThis.fetch = async () => new Response(JSON.stringify({message:{content}}), {status:200});
+    responseContent = content;
     await assert.rejects(
-      completeJson({kind:'ollama',url:'http://127.0.0.1:11434',model:'test'}, {system:'system',prompt:'prompt',schema:{type:'object'}}),
+      completeJson({kind:'ollama',url:base,model:'test'}, {system:'system',prompt:'prompt',schema:{type:'object'}}),
       error => error instanceof ProviderError && error.status === 502 && !error.message.includes('private-provider-details')
     );
   }
 });
 
 test('cancelling an in-flight provider request aborts the transport without retrying', async t => {
-  const originalFetch = globalThis.fetch;
-  t.after(() => { globalThis.fetch = originalFetch; });
   const controller = new AbortController();
-  let calls = 0, capturedSignal;
-  globalThis.fetch = async (_url, {signal}) => {
+  let calls = 0, requestStarted, connectionClosed;
+  const started = new Promise(resolve => { requestStarted = resolve; });
+  const closed = new Promise(resolve => { connectionClosed = resolve; });
+  const base = await serveJson(t, (_req, res) => {
     calls += 1;
-    capturedSignal = signal;
-    return new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('aborted')), {once:true}));
-  };
-  const job = completeJson({kind:'compatible',url:'https://example.invalid/v1',model:'test'}, {system:'system',prompt:'prompt',schema:{type:'object'},signal:controller.signal});
+    res.on('close', connectionClosed);
+    requestStarted();
+  });
+  const job = completeJson({kind:'compatible',url:base,model:'test'}, {system:'system',prompt:'prompt',schema:{type:'object'},signal:controller.signal});
+  await started;
   controller.abort();
   await assert.rejects(job, error => error instanceof ProviderError && error.status === 499);
-  assert.equal(capturedSignal.aborted, true);
+  await closed;
   assert.equal(calls, 1);
+});
+
+test('non-JSON authentication errors retain their status without exposing provider details', async t => {
+  const base = await serveJson(t, (_req, res) => { res.writeHead(401); res.end('private-provider-details'); });
+  await assert.rejects(
+    completeJson({kind:'compatible',url:base,model:'test'}, {system:'system',prompt:'prompt',schema:{type:'object'}}),
+    error => error.status === 401 && /AI_API_KEY/.test(error.message) && !error.message.includes('private-provider-details')
+  );
 });

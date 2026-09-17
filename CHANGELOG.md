@@ -18,6 +18,8 @@ First public release of IELTS Writing Studio (句进).
 - Friendly configuration errors, switch timeout recovery and analysis locking.
 - Prompt-only drafts retained in history; keyboard state and narrow-screen controls improved.
 - Windows startup and npm start load .env configuration; the launcher respects PORT.
+- Whole-request HTTP deadlines for slower providers and the optional live check, with cancellation and response-size limits.
+- Updated and pinned CI actions to remove deprecated runtime warnings.
 
 ### Limits
 AI estimates are not official results. Local model quality and speed vary. The release is a single-user local app; it does not include hosted inference, Task 1 or cloud sync.

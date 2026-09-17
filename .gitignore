@@ -7,3 +7,5 @@ output/
 tmp/
 tests/live-result.json
 .DS_Store
+*.lnk
+release-artifacts/

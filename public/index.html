@@ -20,7 +20,7 @@
       </a>
       <nav class="header-actions" aria-label="工作台导航">
         <span class="connection" id="connection-status" role="status"><span class="status-dot"></span>正在连接 AI</span>
-        <button class="btn btn-ghost provider-toggle" id="provider-toggle" data-action="toggle-provider" title="在本地 AI 和 Codex 之间切换"><span data-icon="refresh"></span><span class="provider-toggle-label">切换 AI</span></button>
+        <label class="sr-only" for="provider-select">下一篇分析使用的 AI 服务</label><select class="provider-select" id="provider-select" title="选择下一篇分析使用的 AI 服务"><option value="auto">自动选择 AI</option><option value="ollama">Ollama 本地</option><option value="openai-compatible">兼容 API</option><option value="codex">Codex CLI</option></select>
         <button class="btn btn-ghost" data-action="history"><span data-icon="history"></span>练习记录<span class="count-badge" id="history-count">0</span></button>
         <button class="btn btn-secondary" data-action="library"><span data-icon="bookmark"></span>我的复习库<span class="count-badge" id="library-count">0</span></button>
       </nav>
@@ -55,7 +55,7 @@
       </article>
       <article class="essay-panel model-panel" id="model-panel">
         <div class="panel-heading"><span class="panel-number">03</span><div><h2 class="panel-title">高分范文</h2><p class="panel-subtitle">A FRESH PERSPECTIVE</p></div><div class="panel-tools"><button class="icon-btn" data-action="copy-model" aria-label="复制高分范文" disabled><span data-icon="copy"></span></button></div></div>
-        <div class="panel-tabs"><span class="panel-tab active">独立审题 · 全新构思</span><button class="text-button" id="model-toggle" data-action="toggle-model" disabled>展开范文</button></div>
+        <div class="panel-tabs"><span class="panel-tab active">独立审题 · 全新构思</span><button class="text-button" id="model-toggle" data-action="toggle-model" aria-controls="model-body" aria-expanded="false" disabled>展开范文</button></div>
         <div class="essay-body" id="model-body"></div><div class="panel-footer"><span id="model-word-count">另一种思路，同一道题</span><span class="model-source-label">仅根据题目创作</span></div><div id="model-score" class="score-block"></div>
       </article>
     </section>
@@ -65,7 +65,7 @@
       <div class="section-heading"><div><p class="eyebrow">MAKE IT YOURS</p><h2 id="review-heading">读懂了，还要用得出来。</h2><p class="section-description">把这次的错误和好表达，带到下一道题里。</p></div><div class="section-actions"><button class="btn btn-secondary btn-small" data-action="export" id="export-button" disabled><span data-icon="download"></span>导出学习笔记</button></div></div>
       <div class="review-grid"><section class="review-column"><div class="review-column-heading"><h3><span data-icon="target"></span>我的易错点</h3><span class="review-count" id="errors-total">00</span></div><div id="review-errors"></div></section><section class="review-column"><div class="review-column-heading"><h3><span data-icon="link"></span>实用搭配</h3><span class="review-count" id="phrases-total">00</span></div><div id="review-phrases"></div></section><section class="review-column"><div class="review-column-heading"><h3><span data-icon="lightbulb"></span>好句与论证</h3><span class="review-count" id="notes-total">00</span></div><div id="review-notes"></div></section></div>
     </section>
-    <footer class="page-footer"><span>句进 · 一句一句，向前一步。</span><button class="text-button" data-action="about">评分说明与使用方法 <span aria-hidden="true">↗</span></button></footer>
+    <footer class="page-footer"><span>句进 · 一句一句，向前一步。 · v0.1.0</span><button class="text-button" data-action="about">评分说明与使用方法 <span aria-hidden="true">↗</span></button></footer>
   </main>
   <div id="modal-root"></div><div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 </body>

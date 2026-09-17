@@ -124,8 +124,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   letter-spacing: .4px;
 }
 .header-actions { gap: 9px; }
-.provider-toggle.is-local { color: #214d3e; background: rgba(216,229,207,.45); }
-.provider-toggle .icon { width: 15px; height: 15px; }
+.provider-select { max-width: 134px; min-height: 37px; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--green); background: var(--surface, white); font: inherit; font-size: 12px; }
+.provider-select:disabled { opacity: .55; cursor: wait; }
 .connection {
   display: inline-flex;
   align-items: center;
@@ -665,16 +665,15 @@ h1 > span { color: #7d9170; }
 }
 
 @media (max-width: 639px) {
-  .header-inner { height: 61px; padding: 0 17px; gap: 10px; }
+  .header-inner { min-height: 61px; height: auto; padding: 12px 17px; gap: 10px; flex-wrap: wrap; }
   .brand { gap: 8px; }
   .brand-mark { width: 31px; height: 31px; border-radius: 8px; font-size: 20px; }
   .brand-name { font-size: 15px; }
   .brand-mark > svg { width: 24px; height: 24px; }
-  .header-actions { gap: 0; }
+  .header-actions { gap: 0; margin-left: auto; flex-wrap: wrap; }
   .header-actions .btn { min-height: 32px; padding: 7px 8px; font-size: 11px; }
   .header-actions .btn .icon { width: 14px; height: 14px; }
-  .provider-toggle-label { display: none; }
-  .provider-toggle { padding-left: 7px !important; padding-right: 7px !important; }
+  .provider-select { max-width: 116px; min-height: 32px; font-size: 11px; }
   .connection { display: none; }
   .page { padding: 24px 17px 0; }
   .hero { margin-bottom: 20px; }

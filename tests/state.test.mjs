@@ -8,7 +8,7 @@ import { countWords } from '../public/utils.js';
 // Execute the shipped state transitions with small DOM/network boundaries.
 // This intentionally reads app.js rather than duplicating its persistence logic.
 const appSource = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
-const testedFunctions = ['saveDraft', 'saveHistory', 'analyze', 'freshExercise', 'clearResult'];
+const testedFunctions = ['saveDraft', 'saveHistory', 'analyze', 'freshExercise', 'clearResult', 'updateProviderControls', 'checkConnection', 'switchProvider'];
 const functionsSource = testedFunctions.map(name => {
   const match = appSource.match(new RegExp(`^(?:async )?function ${name}\\([^\\n]*\\) \\{[\\s\\S]*?^\\}`, 'm'));
   assert.ok(match, `Could not find the actual ${name} function in app.js`);
@@ -34,10 +34,14 @@ function harness(overrides = {}) {
     controller: null,
     saveTimer: undefined,
     progressTimer: undefined,
+    providerSwitching: false,
+    providerInfo: { provider: 'ollama', selected: 'auto' },
+    connection: { available: false, checked: false },
+    connectionRequest: 0,
     practiceAnswers: new Map(),
     KEYS: { draft: 'draft', history: 'history' },
     DEMO_PROMPT, DEMO_ESSAY, DEMO_ANALYSIS,
-    countWords, structuredClone, AbortController,
+    countWords, structuredClone, AbortController, AbortSignal,
     Date: { now: () => now },
     crypto: { randomUUID: () => `new-practice-${++nextId}` },
     setTimeout: () => 1,
@@ -46,7 +50,7 @@ function harness(overrides = {}) {
     clearInterval: () => {},
     $: selector => {
       if (!nodes.has(selector)) nodes.set(selector, {
-        classList: { add() {}, remove() {} }, focus() {}, textContent: ''
+        classList: { add() {}, remove() {} }, focus() {}, textContent: '', disabled: false, value: ''
       });
       return nodes.get(selector);
     },
@@ -55,8 +59,8 @@ function harness(overrides = {}) {
     updateCounters() {}, renderAnalysis() {}, renderOriginal() {}, renderAll() {}, setMobileTab() {},
     showError: message => messages.push(message),
     toast: message => messages.push(message),
-    fetch: (_url, options) => new Promise((resolve, reject) => {
-      pending = { resolve, reject, options };
+    fetch: (url, options) => new Promise((resolve, reject) => {
+      pending = { resolve, reject, options, url };
       options.signal.addEventListener('abort', () => reject(new Error('Aborted')), { once: true });
     })
   };
@@ -187,4 +191,59 @@ test('editing a completed essay forks the draft while retaining the original ana
   assert.equal(revision.essay, 'A revised opening paragraph.');
   assert.equal(revision.analysis, null);
   assert.equal(revision.analyzedAt, null);
+});
+
+test('a prompt-only practice remains in history when starting a new exercise', () => {
+  const h = harness({ essay: '', analysis: null, analyzedAt: null });
+  h.run('freshExercise()');
+  assert.equal(h.context.history.length, 1);
+  assert.equal(h.context.history[0].prompt, DEMO_PROMPT);
+  assert.equal(h.context.history[0].essay, '');
+});
+
+test('changing provider blocks analysis and preserves the completed draft', async () => {
+  const h = harness();
+  const previousAnalysis = h.context.state.analysis;
+  const change = h.run('switchProvider("openai-compatible")');
+  assert.equal(h.context.providerSwitching, true);
+  assert.equal(h.context.$('#provider-select').disabled, true);
+  assert.equal(JSON.parse(h.pending().options.body).provider, 'openai-compatible');
+  assert.ok(h.pending().options.signal instanceof AbortSignal);
+  const switchingRequest = h.pending();
+  await h.run('analyze()');
+  assert.equal(h.pending(), switchingRequest);
+  h.pending().resolve({ ok: true, json: async () => ({ provider: 'compatible', selected: 'openai-compatible', available: true, engine: 'Configured API' }) });
+  await change;
+  assert.equal(h.context.providerSwitching, false);
+  assert.equal(h.context.$('#provider-select').disabled, false);
+  assert.equal(h.context.$('#provider-select').value, 'openai-compatible');
+  assert.equal(h.context.connection.available, true);
+  assert.equal(h.context.state.analysis, previousAnalysis);
+});
+
+test('an old connection response cannot overwrite a later provider change', async () => {
+  const h = harness();
+  const statusRequest = h.run('checkConnection()');
+  const oldStatus = h.pending();
+  const change = h.run('switchProvider("codex")');
+  h.pending().resolve({ ok: true, json: async () => ({ provider: 'codex', selected: 'codex', available: true }) });
+  await change;
+  oldStatus.resolve({ ok: true, json: async () => ({ provider: 'ollama', selected: 'auto', available: false }) });
+  await statusRequest;
+  assert.equal(h.context.$('#provider-select').value, 'codex');
+  assert.equal(h.context.connection.provider, 'codex');
+});
+
+test('interrupted provider changes recheck server selection before unlocking controls', async () => {
+  const h = harness();
+  const change = h.run('switchProvider("codex")');
+  h.pending().reject(Object.assign(new Error('Timed out'), { name: 'TimeoutError' }));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.pending().url, '/api/status');
+  assert.equal(h.context.$('#provider-select').disabled, true);
+  h.pending().resolve({ ok: true, json: async () => ({ provider: 'codex', selected: 'codex', available: false }) });
+  await change;
+  assert.equal(h.context.$('#provider-select').value, 'codex');
+  assert.equal(h.context.$('#provider-select').disabled, false);
+  assert.equal(h.context.providerSwitching, false);
 });

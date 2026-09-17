@@ -1,88 +1,111 @@
-# 句进 · 雅思写作工作台
+# IELTS Writing Studio · 句进
 
-一个可自托管的 IELTS Writing Task 2 学习工作台：原文诊断、保留原意的精修、独立范文、四项标准估分和可自测复习库。
+[简体中文](README.zh-CN.md) · [Download v0.1.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.1.0) · [Changelog](CHANGELOG.md)
 
-## 关于“免费 AI”
+A local IELTS Writing Task 2 practice app that turns essay feedback into reusable learning cards. Compare your draft, a minimally corrected version, and an independently generated model essay, then practise the language you want to retain.
 
-GitHub 只能保存和分发代码，不能为每个访问者免费提供无限模型推理。公开网页不能放入作者的 API key，否则任何人都可以消耗作者额度。这个项目因此支持三种提供商：
+The learning interface and feedback explanations are in Simplified Chinese; essays and practice sentences are in English. **AI band estimates are learning feedback, not official IELTS results or a promise of improvement.** This project is not affiliated with IELTS.
 
-1. **Ollama（推荐，免费本地推理）**：每位使用者在自己的电脑安装 [Ollama](https://ollama.com/)，运行 `ollama pull qwen2.5:7b`。题目和作文留在本机，不需要 API key。
-2. **OpenAI 兼容接口**：可以接 Groq、OpenRouter、LM Studio、vLLM 或其他兼容 `/chat/completions` 的服务。免费额度取决于服务商；key 只放在服务端环境变量中。
-3. **Codex CLI（兼容旧环境）**：本项目仍支持当前本机开发配置，但公开仓库不依赖它。
+![Desktop workspace using the labelled built-in teaching example](docs/images/studio-desktop.jpg)
 
-GitHub Pages 只能展示预设示例，因为它不能运行 `server.mjs`，也不能安全保存 API key。要让访客真正提交作文，需要每位访客自托管 Node + Ollama，或者部署自己的后端并配置自己的兼容接口。项目不承诺无限免费公共 AI。
+## The learning workflow
 
-## 本机运行
+| Your original | Minimal correction | Independent model |
+| --- | --- | --- |
+| Write or paste an essay and inspect highlighted issues | Fix grammar, spelling and collocations while retaining the argument | Explore another argument generated from the question and target band only |
+| Review evidence for TR, CC, LR and GRA estimates | See why grammar fixes may leave reasoning weaknesses | Inspect useful expressions and reasoning moves |
 
-安装 Node.js 20+ 和 Ollama 后：
+Click a highlight to see the source, revision, explanation and a short exercise. The app prioritizes three actions per essay, offers spaced review at 1/3/7/14/30 days, stores up to 30 exercises in the browser, and exports Markdown study notes. A labelled built-in example works without a model.
 
-```powershell
+## Run locally
+
+Install [Node.js 24 LTS](https://nodejs.org/) (minimum 22.9). Download and extract the release source ZIP, or clone:
+
+```sh
+git clone https://github.com/wang-qingfeng-dev/ielts-writing-studio.git
+cd ielts-writing-studio
+npm start
+```
+
+No `npm install` is needed: the server uses Node built-ins and the UI uses native browser modules. Open [http://127.0.0.1:4318](http://127.0.0.1:4318). The example is usable immediately; real analysis needs one of the providers below. On Windows, `Start Writing Studio.cmd` starts the server in the background and opens the page.
+
+If npm is unavailable, use `node --env-file-if-exists=.env server.mjs`.
+
+### Local model with Ollama
+
+Install and start [Ollama](https://ollama.com/), then download a model:
+
+```sh
 ollama pull qwen2.5:7b
-Copy-Item .env.example .env
-node server.mjs
 ```
 
-然后打开 http://127.0.0.1:4318。Windows 用户也可以双击 **Start Writing Studio.cmd**；启动器会在后台启动服务并打开浏览器。服务只监听本机地址。
+Select **Ollama 本地** in the page header. Local inference needs no API key or hosted API subscription, but uses your computer's memory and compute. The suggested model is a starting configuration, not a validated IELTS assessor; feedback quality, speed and schema reliability vary.
 
-如果 Ollama 使用其他模型：
+To change models or configure an API, copy `.env.example` to `.env` (Windows: `Copy-Item .env.example .env`; macOS/Linux: `cp .env.example .env`), edit it and restart the server. Both `npm start` and the Windows launcher load this file. Existing shell variables take precedence.
 
-```powershell
-$env:AI_MODEL = 'qwen2.5:3b'
-node server.mjs
+### Compatible API or optional Codex CLI
+
+For an OpenAI-compatible Chat Completions service, configure:
+
+```dotenv
+AI_PROVIDER=openai-compatible
+AI_BASE_URL=https://your-provider.example/v1
+OPENAI_MODEL=your-provider-model-name
+AI_API_KEY=your-server-side-key
 ```
 
-如果使用 OpenAI 兼容接口：
+Replace these placeholders with your provider's values. A locally hosted compatible service may not require a key. Support depends on the provider's API and model; this release does not certify every compatible service. Costs and quotas are controlled by the provider.
 
-```powershell
-$env:AI_PROVIDER = 'openai-compatible'
-$env:AI_BASE_URL = 'https://api.groq.com/openai/v1'
-$env:AI_API_KEY = '只在服务端设置，不要放进 public/ 文件'
-$env:AI_MODEL = '你的模型名'
-node server.mjs
+The optional **Codex CLI** choice uses your own installed, authenticated CLI and account quota. It is never selected as an automatic fallback. No author's credentials or subscription are included.
+
+| Setting | Purpose |
+| --- | --- |
+| `AI_PROVIDER` | `ollama`, `openai-compatible`, `codex`, or `auto` |
+| `OLLAMA_HOST` | Defaults to `http://127.0.0.1:11434` |
+| `OLLAMA_MODEL` | Defaults to `qwen2.5:7b` |
+| `AI_BASE_URL`, `OPENAI_MODEL`, `AI_API_KEY` | Compatible service configuration; key stays server-side |
+| `AI_MODEL` | Legacy fallback if a provider-specific model is unset |
+| `IELTS_CODEX_PATH` | Optional path to the installed Codex executable |
+| `PORT` | Local port; default `4318` |
+
+The header selects a provider for the current server session. **Auto** prefers a responding Ollama service, then an explicitly configured API; otherwise it reports Ollama unavailable. An installed Ollama model is still required. Restarting restores the environment configuration. Switching is disabled during analysis.
+
+## Privacy and scope
+
+- The server listens on `127.0.0.1` only and rejects cross-site requests. It is a single-user local app, not a hardened multi-user hosting service.
+- Drafts, exercise history and review cards stay in that browser's local storage; they are not encrypted or synchronized. Export important work before clearing browser data or changing origin/port.
+- Submitted writing goes to the selected provider. With the default loopback Ollama configuration, inference stays local. An external API, remote Ollama host or Codex service receives the relevant content under its own terms.
+- Correction and model-essay generation use separate requests. The model-essay request omits the student's draft. Outputs must pass score, structure and exact quotation checks; failures never silently substitute demo feedback.
+- Keys, local logs and live test results are ignored by Git. Never put credentials in `public/`.
+- v0.1.0 covers Task 2 only. It does not include Task 1, cloud sync, accounts, a public inference service, or validated prediction of official bands. GitHub Releases distributes code; it does not host the Node backend.
+
+See [Security](SECURITY.md), [third-party boundaries](THIRD_PARTY_NOTICES.md) and [verification](docs/release-verification-v0.1.0.md).
+
+## Development
+
+```sh
+node --test tests/*.test.mjs
 ```
 
-也可以把这些变量写进 `.env`；项目不会自动读取 `.env`，请在启动脚本、PowerShell 或部署平台的环境变量设置中加载它们。这样可以避免无依赖 dotenv 带来的隐式密钥读取。
+The suite covers request boundaries, annotation validation, independent model context, provider selection, mocked HTTP integrations, cancellation, rendering safety and draft/review state. CI runs on Node 22 and 24.
 
-## 使用方法
+An optional live check submits the included test essay to a running configured service and may use account quota:
 
-1. 首次打开显示带明确标记的预设学习示例。点击 **新练习**，粘贴完整题目和英文作文，选择目标分数。
-2. 点击 **开始分析**。真实批改通常需要数分钟；可以随时停止，题目和原文不会丢失。顶部状态会显示当前 provider。
-3. 页面右上角的 **切到本地 AI / 切到 Codex** 按钮可以随时切换模式；切换只影响当前本机服务，不会改动作文记录。Ollama 未安装或没有模型时，状态会明确提示安装命令。
-4. 先看三个提分重点。点击原文或精修版本的彩色标注，联动查看原句、修改、中文原因和同类练习。
-5. 右栏范文只接收题目与目标分，不接收学生原文。真实练习中默认折叠，可随时展开。
-6. 三栏各有 TR、CC、LR、GRA 四项估分与具体证据。它们是 AI 练习估分，非官方成绩；语法改正不保证总分提升。
-7. 收藏底部的错误、搭配与论证卡片。在 **我的复习库** 遮住答案自测，按 1、3、7、14、30 天复习；不熟悉的卡片 10 分钟后重练。
-8. **练习记录** 保存最近 30 篇真实练习及草稿。**导出学习笔记** 下载完整 Markdown 文件，包含三篇作文、评分、修改和学习卡片。
-
-草稿、练习记录和收藏保存在当前浏览器本机存储中。换浏览器或清除浏览器数据不会同步这些内容。重要练习请导出备份。小练习采用本地参考答案对照；搭配检测只检查使用情况，不提供整句 AI 语法审核。
-
-## 项目文件
-
-- `public/index.html`：页面结构。
-- `public/app.js`：交互、自动保存、历史记录与间隔复习。
-- `public/styles.css`：桌面三栏、手机标签切换和无障碍样式。
-- `public/demo.js`：明确标记的预设示例。
-- `server.mjs`：本机 HTTP 服务，调用选定 provider 进行真实分析。
-- `provider.mjs`：Ollama、OpenAI 兼容接口和 Codex 的 provider 选择与 JSON 调用。
-- `analysis-schema.mjs`：评分、引用和数据完整性校验。
-- `tests/`：自动测试与真实调用检查。
-
-后端将作文视为待分析内容。两个独立请求分别完成批改和范文；返回内容必须通过结构、分数、来源引用和唯一位置校验。服务故障不会用示例结果代替真实批改。Codex 分支使用无交互、只读调用；HTTP provider 只发送必要的题目、作文和提示。
-
-## 验证
-
-在项目目录运行：
-
-```powershell
-node --test tests/backend.test.mjs tests/frontend.test.mjs tests/state.test.mjs
-```
-
-真实 API 检查（会使用当前 provider 的本地模型或账户额度）：
-
-```powershell
+```sh
 node tests/live-check.mjs
 ```
 
-网页真实分析需要 Ollama 本地模型或有效的兼容接口配置。若显示连接不可用，检查顶部提示并刷新；后台错误记录在 `server-error.log`。此版本不包含 Task 1、云同步或多人账号。
+| Path | Responsibility |
+| --- | --- |
+| `public/` | UI, draft storage, annotations, study cards and demo data |
+| `server.mjs` | Local HTTP API, independent analysis jobs and process isolation |
+| `provider.mjs` | Ollama, compatible API and optional CLI adapters |
+| `analysis-schema.mjs` | JSON schemas, band boundaries and source validation |
+| `tests/` | Automated regression tests and optional live check |
+| `CONTRACT.md` | API and UI structure |
 
-参考：[IELTS 官方评分说明](https://ielts.org/take-a-test/your-results/ielts-scoring-in-detail) · [Codex 非交互模式](https://developers.openai.com/codex/noninteractive)
+## License and references
+
+[MIT](LICENSE), copyright WANG QINGFENG. Model weights, provider services and external IELTS materials retain their own terms; see [Third-party notices](THIRD_PARTY_NOTICES.md).
+
+Scoring dimensions refer to the [official IELTS explanation](https://ielts.org/take-a-test/your-results/ielts-scoring-in-detail). This app's generated scores are not examiner assessments.

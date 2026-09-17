@@ -1,8 +1,11 @@
 {
   "name": "ielts-writing-studio",
-  "version": "1.0.0",
+  "version": "0.1.0",
+  "description": "A local IELTS Task 2 writing studio with linked feedback and spaced review.",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/wang-qingfeng-dev/ielts-writing-studio.git" },
   "private": true,
   "type": "module",
-  "scripts": { "start": "node server.mjs", "test": "node --test tests/*.test.mjs" },
-  "engines": { "node": ">=20" }
+  "scripts": { "start": "node --env-file-if-exists=.env server.mjs", "test": "node --test tests/*.test.mjs" },
+  "engines": { "node": ">=22.9.0" }
 }

@@ -77,7 +77,7 @@ function saveDraft() {
 }
 function scheduleSave() { $('#save-state').textContent = '正在保存…'; clearTimeout(saveTimer); saveTimer = setTimeout(saveDraft, 450); }
 function saveHistory() {
-  if (state.mode === 'demo' || !state.essay.trim()) return;
+  if (state.mode === 'demo' || (!state.essay.trim() && !state.prompt.trim())) return;
   const previousRecord = history.find(item => item.id === state.id);
   if (!state.analysis && previousRecord?.analysis) return;
   const record = { id:state.id,prompt:state.prompt,essay:state.essay,targetBand:state.targetBand,analysis:state.analysis,date:state.analyzedAt || state.createdAt,createdAt:state.createdAt,analyzedAt:state.analyzedAt,mode:'real' };
@@ -91,13 +91,11 @@ function updateCounters() {
 }
 function updateProviderControls(info = providerInfo) {
   providerInfo = {...providerInfo,...info};
-  const button = $('#provider-toggle');
-  if (!button) return;
-  const isLocal = providerInfo.provider === 'ollama';
-  button.querySelector('.provider-toggle-label').textContent = isLocal ? '切到 Codex' : '切到本地 AI';
-  button.title = isLocal ? '下一篇分析使用 Codex' : '下一篇分析使用 Ollama 本地免费模型';
-  button.classList.toggle('is-local', isLocal);
-  button.setAttribute('aria-label', isLocal ? '切换到 Codex' : '切换到本地 AI');
+  const select = $('#provider-select');
+  if (!select) return;
+  select.value = providerInfo.selected || 'auto';
+  select.title = providerInfo.message || '选择下一篇分析使用的 AI 服务；密钥仅在服务器配置。';
+  select.disabled = state.busy || providerSwitching;
 }
 function updateWordCount() {
   const words = countWords(state.essay);
@@ -154,13 +152,15 @@ function renderAnalysis() {
   $('#prompt-input').readOnly = state.busy;
   $('#essay-input').readOnly = state.busy;
   $('#target-band').disabled = state.busy;
-  $$('[data-action="new"], [data-action="demo"], [data-action="history"], [data-action="toggle-provider"], [data-action="analyze"]').forEach(button=>button.disabled=state.busy || providerSwitching);
+  $$('[data-action="new"], [data-action="demo"], [data-action="history"], [data-action="analyze"]').forEach(button=>button.disabled=state.busy || providerSwitching);
+  $('#provider-select').disabled = state.busy || providerSwitching;
   renderPriorities();
   renderReview();
 }
 function renderModel() {
   const a = state.analysis;
   $('#model-toggle').textContent = state.modelOpen ? '收起范文' : '展开范文';
+  $('#model-toggle').setAttribute('aria-expanded', String(!!a && state.modelOpen));
   if (state.busy) { $('#model-body').innerHTML = loadingPanel('model'); return; }
   if (!a) { $('#model-body').innerHTML = emptyPanel('model'); return; }
   if (!state.modelOpen) {
@@ -228,6 +228,7 @@ function clearResult() {
 $('#prompt-input').addEventListener('input', event=>{ clearResult(); state.prompt=event.target.value; scheduleSave(); });
 $('#essay-input').addEventListener('input', event=>{ clearResult(); state.essay=event.target.value; updateWordCount(); scheduleSave(); });
 $('#target-band').addEventListener('change', event=>{ clearResult(); state.targetBand=Number(event.target.value); scheduleSave(); });
+$('#provider-select').addEventListener('change', event=>{ switchProvider(event.target.value); });
 window.addEventListener('pagehide', saveDraft);
 
 async function checkConnection() {
@@ -242,29 +243,32 @@ async function checkConnection() {
     updateProviderControls(connection);
     el.innerHTML = `<span class="status-dot ${connection.available?'':'offline'}"></span>${connection.available?'AI 已就绪':'AI 暂未连接'}`;
     el.title = connection.message || '';
-  } catch { if(requestId !== connectionRequest)return; connection={available:false,checked:true}; el.innerHTML='<span class="status-dot offline"></span>服务未连接'; el.title='请运行项目目录里的“启动写作工作台.cmd”'; }
+  } catch { if(requestId !== connectionRequest)return; connection={available:false,checked:true}; el.innerHTML='<span class="status-dot offline"></span>服务未连接'; el.title='请运行 npm start，或双击项目目录中的 Start Writing Studio.cmd。'; updateProviderControls(); }
 }
-async function toggleProvider() {
+async function switchProvider(next) {
   if (state.busy || providerSwitching) return;
-  const isLocal = providerInfo.provider === 'ollama';
-  const next = isLocal ? 'codex' : 'ollama';
-  const button = $('#provider-toggle');
-  providerSwitching = true; button.disabled = true; $('#analyze-button').disabled = true;
+  if (!['auto','ollama','codex','openai-compatible'].includes(next)) return;
+  providerSwitching = true; $('#provider-select').disabled = true; $('#analyze-button').disabled = true;
   ++connectionRequest;
   try {
-    const response = await fetch('/api/provider',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider:next})});
+    const response = await fetch('/api/provider',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider:next}),signal:AbortSignal.timeout(12000)});
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || '切换 AI 模式失败。');
+    connection = {...result,checked:true};
     providerInfo = result; updateProviderControls(result);
-    const label = result.provider === 'ollama' ? '本地 AI' : result.provider === 'codex' ? 'Codex' : result.engine;
-    toast(`已切换到 ${label}。${result.available?'可以开始分析。':'当前模式尚未连接。'}`);
+    const label = result.provider === 'ollama' ? '本地 AI' : result.provider === 'codex' ? 'Codex' : result.engine || '所选 AI';
+    toast(`已切换到 ${label}。${result.available?'可以开始分析。':result.message || '当前模式尚未连接。'}`);
     const el=$('#connection-status');el.innerHTML=`<span class="status-dot ${result.available?'':'offline'}"></span>${result.available?'AI 已就绪':'AI 暂未连接'}`;el.title=result.message||'';
-  } catch (error) { toast(error.message || '切换 AI 模式失败。'); }
-  finally { providerSwitching = false; button.disabled = false; renderAnalysis(); }
+  } catch (error) {
+    toast(error.name === 'TimeoutError' ? '切换等待超时，正在重新检查当前 AI 模式。' : error.message || '切换 AI 模式失败。');
+    // The server may have accepted the change before the response was interrupted.
+    await checkConnection();
+  }
+  finally { providerSwitching = false; updateProviderControls(); renderAnalysis(); }
 }
 function showError(message) { $('#error').textContent = message; $('#error').classList.remove('hidden'); $('#error').scrollIntoView({behavior:'smooth',block:'center'}); }
 async function analyze() {
-  if (state.busy) return;
+  if (state.busy || providerSwitching) return;
   if (!state.prompt.trim()) { showError('先粘贴完整的作文题目，包含最后的提问要求。'); $('#prompt-input').focus(); return; }
   if (countWords(state.essay) < 40) { showError('请先写下至少 40 个英文词，再开始分析。完整 Task 2 作文建议至少 250 词。'); state.originalView='edit';renderOriginal(); $('#essay-input').focus(); return; }
   const previous = { analysis:state.analysis,mode:state.mode,id:state.id,originalView:state.originalView,modelOpen:state.modelOpen,analyzedAt:state.analyzedAt };
@@ -432,7 +436,6 @@ document.addEventListener('click', async event=>{
   switch(data.action){
     case 'analyze': await analyze();break;
     case 'cancel': controller?.abort('user');break;
-    case 'toggle-provider': await toggleProvider();break;
     case 'new':freshExercise();break;
     case 'demo':freshExercise(true);break;
     case 'toggle-model':state.modelOpen=!state.modelOpen;renderModel();saveDraft();break;
@@ -468,4 +471,5 @@ document.addEventListener('keydown',event=>{
   }
 });
 renderAll();
+setMobileTab('original');
 checkConnection();

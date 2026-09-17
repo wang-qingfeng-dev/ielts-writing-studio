@@ -1,6 +1,6 @@
 # Shared implementation contract
 
-Zero-dependency Node HTTP server and native ES modules in public/. Chinese learning UI. Server listens only on 127.0.0.1:4318 (PORT override). AI provider is selected by AI_PROVIDER=auto|ollama|openai-compatible|codex. Auto prefers local Ollama, then AI_BASE_URL, then legacy Codex.
+Zero-dependency Node HTTP server and native ES modules in public/. Chinese learning UI. Server listens only on 127.0.0.1:4318 (PORT override). AI provider is selected by AI_PROVIDER=auto|ollama|openai-compatible|codex. Auto prefers an available Ollama service, then a configured AI_BASE_URL, otherwise reports Ollama unavailable. Codex requires explicit selection. Provider switching applies to the current server process. OLLAMA_MODEL and OPENAI_MODEL configure each provider independently; AI_MODEL remains a legacy fallback.
 
 GET /api/status => { available: boolean, engine: string, message: string }
 POST /api/analyze body { prompt: string, essay: string, targetBand: number } => Analysis below. Non-2xx JSON {error:string}. Real analysis only; never silently return demo. POST cancellation should stop work if practical; server single request limit. Client timeout 10 min.
@@ -21,7 +21,7 @@ All quote/original snippets must be exact substrings of corresponding text. Issu
 
 Demo module public/demo.js exports DEMO_PROMPT (string), DEMO_ESSAY (string), DEMO_ANALYSIS (Analysis). It is transparently labelled sample, never used as evaluation fallback.
 
-Frontend shell class structure (style agent owns styles.css, root owns markup and JS):
+Frontend shell class structure:
 .app-header > .header-inner > .brand (.brand-mark,.brand-name,.brand-tag) + .header-actions (.connection,.btn)
 .page > .hero (.eyebrow,h1,.hero-copy,.hero-side)
 .prompt-card > .section-kicker + .prompt-textarea + .prompt-footer (.task-badge,.target-control,.prompt-hint)

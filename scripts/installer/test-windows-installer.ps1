@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$InstallerPath,
     [int]$Port = 4326
 )

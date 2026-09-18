@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$SourceRef = 'main',
     [ValidatePattern('^v\d+\.\d+\.\d+$')]
     [string]$ReleaseVersion = 'v0.1.1',
@@ -29,7 +29,7 @@ foreach ($file in $sourceFiles) {
     $relative = $file.FullName.Substring($packageRoot.Length + 1).Replace('\', '/')
     if ($relative -match '(^|/)(\.git/|release-artifacts/|output/|tmp/|node_modules/)|(^|/)\.env($|\.(?!example$))|\.log$|\.lnk$|(^|/)live-result\.json$') {
         throw "Excluded local artifact appeared in the source tag: $relative"
-    }
+    };
 }
 
 # 固定官方版本，并核对官方 SHA-256 后再解压完整发行包及其许可证。
@@ -66,6 +66,17 @@ $readme = [IO.File]::ReadAllText($readmePath).Replace('v0.1.0', $ReleaseVersion)
 [IO.File]::WriteAllText($readmePath, $readme, $utf8)
 
 # 清单记录来源与哈希；源码全量校验可对照 SourceCommit 重新运行 git archive。
+$runtimeManifest = [ordered]@{
+    Name = 'Node.js'
+    Version = $NodeVersion
+    OfficialArchiveUrl = "$nodeBaseUrl/$nodeFile"
+    OfficialChecksumsUrl = "$nodeBaseUrl/SHASUMS256.txt"
+    ArchiveSHA256 = $actualNodeHash
+    ExecutableSHA256 = (Get-FileHash -LiteralPath (Join-Path $runtimeDirectory 'node.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
+    CompleteOfficialDistribution = $true
+    FileCount = @(Get-ChildItem -LiteralPath $runtimeDirectory -Recurse -File).Count
+    License = "runtime/$nodeDirectory/LICENSE"
+}
 $manifest = [ordered]@{
     FormatVersion = 1
     Application = 'IELTS Writing Studio'
@@ -74,17 +85,7 @@ $manifest = [ordered]@{
     SourceArchiveSHA256 = (Get-FileHash -LiteralPath $sourceZip -Algorithm SHA256).Hash.ToLowerInvariant()
     SourceFileCount = $sourceFiles.Count
     Platform = 'Windows x64'
-    Runtime = [ordered]@{
-        Name = 'Node.js'
-        Version = $NodeVersion
-        OfficialArchiveUrl = "$nodeBaseUrl/$nodeFile"
-        OfficialChecksumsUrl = "$nodeBaseUrl/SHASUMS256.txt"
-        ArchiveSHA256 = $actualNodeHash
-        ExecutableSHA256 = (Get-FileHash -LiteralPath (Join-Path $runtimeDirectory 'node.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
-        CompleteOfficialDistribution = $true
-        FileCount = @(Get-ChildItem -LiteralPath $runtimeDirectory -Recurse -File).Count
-        License = "runtime/$nodeDirectory/LICENSE"
-    }
+    Runtime = $runtimeManifest
     AdditionalFiles = @('Start Portable.cmd', 'README.portable.zh-CN.md', 'PORTABLE-MANIFEST.json', "runtime/SHASUMS256-$NodeVersion.txt")
     LauncherSHA256 = (Get-FileHash -LiteralPath (Join-Path $packageRoot 'Start Portable.cmd') -Algorithm SHA256).Hash.ToLowerInvariant()
     ContainsAIModel = $false

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Model = 'qwen2.5:7b'
 )
 

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [int]$Port = 4325,
     [ValidatePattern('^v\d+\.\d+\.\d+$')]
     [string]$ReleaseVersion = 'v0.1.1'

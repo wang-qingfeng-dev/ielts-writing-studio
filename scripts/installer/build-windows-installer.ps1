@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$SourceRef = 'main',
     [ValidatePattern('^v\d+\.\d+\.\d+$')]
     [string]$ReleaseVersion = 'v0.1.1',
@@ -18,8 +18,11 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $projectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $sourceCommit = (& git -C $projectRoot rev-parse "$SourceRef^{commit}").Trim()
 if ($LASTEXITCODE -ne 0 -or -not $sourceCommit) { throw "无法解析源码版本：$SourceRef" }
-$artifactRoot = if ($OutputDir) { (Resolve-Path -LiteralPath $OutputDir -ErrorAction SilentlyContinue).Path } else { Join-Path $projectRoot 'release-artifacts' }
-if (-not $artifactRoot) { $artifactRoot = $OutputDir }
+$artifactRoot = Join-Path $projectRoot 'release-artifacts'
+if ($OutputDir) {
+    $artifactRoot = $OutputDir
+    if (Test-Path -LiteralPath $OutputDir) { $artifactRoot = (Resolve-Path -LiteralPath $OutputDir).Path }
+}
 New-Item -ItemType Directory -Path $artifactRoot -Force | Out-Null
 $packageName = "ielts-writing-studio-$ReleaseVersion-windows-x64"
 $portableArchive = Join-Path $artifactRoot "$packageName.zip"
@@ -48,7 +51,8 @@ if ($sourceManifest.SourceCommit -ne $sourceCommit) { throw '便携包来源提�
 # 优先使用 PATH 中的 ISCC；没有时把官方安装程序放在仓库外的隔离工具目录。
 $iscc = Get-Command ISCC.exe -ErrorAction SilentlyContinue
 if ($iscc) { $isccPath = $iscc.Source } else {
-    $toolRoot = if ($InnoRoot) { $InnoRoot } else { Join-Path $projectRoot '.tools\inno' }
+    $toolRoot = Join-Path $projectRoot '.tools\inno'
+    if ($InnoRoot) { $toolRoot = $InnoRoot }
     $isccPath = Join-Path $toolRoot 'ISCC.exe'
     if (-not (Test-Path -LiteralPath $isccPath)) {
         New-Item -ItemType Directory -Path $toolRoot -Force | Out-Null

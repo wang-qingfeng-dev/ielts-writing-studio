@@ -1,4 +1,4 @@
-param(
+﻿param(
     [switch]$SetupAI,
     [switch]$NoBrowser
 )
@@ -96,7 +96,8 @@ if (-not $studioReachable) {
 # 安装完成后默认进入一次设置页；日常启动仍然直接进入工作台。
 $studioNoBrowser = $NoBrowser -or $env:IELTS_STUDIO_NO_BROWSER -eq '1'
 if (-not $studioNoBrowser) {
-    $studioLaunchUrl = if ($SetupAI) { "$studioUrl/?setup=1" } else { $studioUrl }
+    $studioLaunchUrl = $studioUrl
+    if ($SetupAI) { $studioLaunchUrl = "$studioUrl/?setup=1" }
     Start-Process $studioLaunchUrl
 }
 Write-Host "句进雅思写作工作台已启动：$studioUrl"

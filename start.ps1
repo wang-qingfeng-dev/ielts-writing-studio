@@ -69,7 +69,9 @@ if (-not $studioReachable) {
         }
     }
     $studioServerPath = Join-Path $studioRoot 'server.mjs'
-    $studioServerArgs = @($studioEnvArgs + $studioServerPath)
+    # Start-Process 会把 ArgumentList 的元素再次按空格拆分；服务路径必须显式加引号，安装目录可以包含空格或中文。
+    $studioServerArgs = @($studioEnvArgs)
+    $studioServerArgs += '"' + $studioServerPath + '"'
     $studioOutputPath = Join-Path $studioRoot 'server.log'
     $studioErrorPath = Join-Path $studioRoot 'server-error.log'
     $studioProcess = Start-Process -FilePath $studioNodePath -ArgumentList $studioServerArgs -WorkingDirectory $studioRoot -WindowStyle Hidden -RedirectStandardOutput $studioOutputPath -RedirectStandardError $studioErrorPath -PassThru

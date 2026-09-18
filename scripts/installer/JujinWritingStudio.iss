@@ -34,7 +34,6 @@ OutputDir={#OutputDir}
 OutputBaseFilename=ielts-writing-studio-{#AppVersion}-windows-x64-setup
 DisableWelcomePage=no
 ChangesAssociations=no
-VersionInfoVersion={#AppVersion}
 VersionInfoDescription=句进·雅思写作工作台一键安装程序
 VersionInfoCopyright=MIT License
 SetupLogging=yes

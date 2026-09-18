@@ -6,6 +6,7 @@
     [string]$NodeVersion = 'v24.19.0',
     [string]$OutputDir,
     [string]$InnoRoot,
+    [string]$BuildRoot,
     [switch]$SkipPortableBuild,
     [switch]$KeepBuildDirectory
 )
@@ -35,11 +36,20 @@ if (-not $SkipPortableBuild) {
 }
 if (-not (Test-Path -LiteralPath $portableArchive)) { throw "找不到便携版归档：$portableArchive" }
 
-$buildRoot = Join-Path $artifactRoot ('installer-build-' + [guid]::NewGuid().ToString('N'))
+$buildRoot = if ($BuildRoot) { (New-Item -ItemType Directory -Path $BuildRoot -Force).FullName } else { Join-Path $artifactRoot ('installer-build-' + [guid]::NewGuid().ToString('N')) }
+$buildRoot = Join-Path $buildRoot ('build-' + [guid]::NewGuid().ToString('N'))
+$null = New-Item -ItemType Directory -Path $buildRoot -Force
 $sourceRoot = Join-Path $buildRoot $packageName
 New-Item -ItemType Directory -Path $sourceRoot -Force | Out-Null
 [IO.Compression.ZipFile]::ExtractToDirectory($portableArchive, $buildRoot)
 if (-not (Test-Path -LiteralPath $sourceRoot)) { throw '便携版归档目录结构不正确。' }
+
+# 应用只需要 node.exe；去掉发行包中 npm 的深层依赖目录，避免 Windows 路径限制并缩小安装器。
+$installerNodeRoot = Join-Path $sourceRoot "runtime\node-$NodeVersion-win-x64"
+foreach ($optionalRuntimePath in @('node_modules', 'npm', 'npx', 'corepack', 'corepack.cmd', 'install_tools.bat', 'nodevars.bat')) {
+    $optionalRuntime = Join-Path $installerNodeRoot $optionalRuntimePath
+    if (Test-Path -LiteralPath $optionalRuntime) { Remove-Item -LiteralPath $optionalRuntime -Recurse -Force }
+}
 
 # 安装后可选的一键模型准备工具，模型仍需用户主动下载，不把数 GB 模型放进安装器。
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'setup-ai.ps1') -Destination (Join-Path $sourceRoot 'setup-ai.ps1')
@@ -47,6 +57,8 @@ $setupCmd = @('@echo off', 'setlocal', 'powershell.exe -NoProfile -ExecutionPoli
 [IO.File]::WriteAllText((Join-Path $sourceRoot 'Setup AI.cmd'), $setupCmd, [Text.Encoding]::ASCII)
 $sourceManifest = Get-Content -LiteralPath (Join-Path $sourceRoot 'PORTABLE-MANIFEST.json') -Raw | ConvertFrom-Json
 if ($sourceManifest.SourceCommit -ne $sourceCommit) { throw '便携包来源提交与目标提交不一致。' }
+$sourceManifest.Runtime.CompleteOfficialDistribution = $false
+$sourceManifest.Runtime | Add-Member -NotePropertyName OmittedFiles -NotePropertyValue @('node_modules/', 'npm', 'npx', 'corepack', 'corepack.cmd', 'install_tools.bat', 'nodevars.bat')
 
 # 优先使用 PATH 中的 ISCC；没有时把官方安装程序放在仓库外的隔离工具目录。
 $iscc = Get-Command ISCC.exe -ErrorAction SilentlyContinue
@@ -54,15 +66,23 @@ if ($iscc) { $isccPath = $iscc.Source } else {
     $toolRoot = Join-Path $projectRoot '.tools\inno'
     if ($InnoRoot) { $toolRoot = $InnoRoot }
     $isccPath = Join-Path $toolRoot 'ISCC.exe'
-    if (-not (Test-Path -LiteralPath $isccPath)) {
+    $compilerReady = Test-Path -LiteralPath $isccPath
+    if ($compilerReady) { $compilerReady = (Get-Item -LiteralPath $isccPath).Length -gt 100000 }
+    if (-not $compilerReady) {
         New-Item -ItemType Directory -Path $toolRoot -Force | Out-Null
         $installerPath = Join-Path $toolRoot 'innosetup-installer.exe'
-        Invoke-WebRequest -Uri 'https://jrsoftware.org/download.php/is.exe' -OutFile $installerPath -UseBasicParsing
+        Invoke-WebRequest -Uri 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe' -OutFile $installerPath -UseBasicParsing
         Start-Process -FilePath $installerPath -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$toolRoot") -Wait -WindowStyle Hidden
         $isccPath = Get-ChildItem -LiteralPath $toolRoot -Filter ISCC.exe -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
     }
 }
 if (-not $isccPath -or -not (Test-Path -LiteralPath $isccPath)) { throw '找不到 Inno Setup 编译器 ISCC.exe。' }
+$innoLanguages = Join-Path (Split-Path -Parent $isccPath) 'Languages'
+$simplifiedChinese = Join-Path $innoLanguages 'ChineseSimplified.isl'
+if (-not (Test-Path -LiteralPath $simplifiedChinese)) {
+    New-Item -ItemType Directory -Path $innoLanguages -Force | Out-Null
+    Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/ChineseSimplified.isl' -OutFile $simplifiedChinese -UseBasicParsing
+}
 
 $outputDirResolved = (New-Item -ItemType Directory -Path (Join-Path $artifactRoot 'installer-output') -Force).FullName
 $iss = Join-Path $PSScriptRoot 'JujinWritingStudio.iss'

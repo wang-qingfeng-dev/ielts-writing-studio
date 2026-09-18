@@ -91,7 +91,7 @@ The header selects a provider for the current server session. **Auto** prefers a
 - Keys, local logs and live test results are ignored by Git. Never put credentials in `public/`.
 - v0.1.1 covers Task 2 only. It does not include Task 1, cloud sync, accounts, a public inference service, or validated prediction of official bands. GitHub Releases distributes code and installers; it does not host the Node backend.
 
-See [Security](SECURITY.md), [third-party boundaries](THIRD_PARTY_NOTICES.md) and [verification](docs/release-verification-v0.1.0.md).
+See [Security](SECURITY.md), [third-party boundaries](THIRD_PARTY_NOTICES.md) and [v0.1.1 verification](docs/release-verification-v0.1.1.md).
 
 ## Development
 

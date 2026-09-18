@@ -11,12 +11,12 @@
 
 ## 发布文件
 
-| 文件 | SHA-256 | 说明 |
+| 文件 | 校验方式 | 说明 |
 | --- | --- | --- |
-| `ielts-writing-studio-v0.1.1-windows-x64-setup.exe` | `e43acdab6d423d3f04e668b20dc278cb1d43a4fb4782c8e9c848ece1ae0d3500` | Windows x64 一键安装程序 |
-| `ielts-writing-studio-v0.1.1-windows-x64.zip` | `b60557a4a953e2a51e195ebd047fb2fcba3033826e0ef9fbc246b6cbc5949c40` | Windows x64 免安装便携包 |
+| `ielts-writing-studio-v0.1.1-windows-x64-setup.exe` | 同名 `.sha256` 和安装器 manifest | Windows x64 一键安装程序 |
+| `ielts-writing-studio-v0.1.1-windows-x64.zip` | 同名 `.sha256` 和便携包 manifest | Windows x64 免安装便携包 |
 
-两个包都不包含 AI 模型、API key 或个人作文数据。安装器默认安装到当前用户的 `%LOCALAPPDATA%\\Programs\\JujinWritingStudio`，不需要管理员权限。
+两个包都不包含 AI 模型、API key 或个人作文数据。下载后请使用同名 `.sha256` 文件核对 SHA-256；安装器 manifest 还记录了来源提交和文件大小。安装器默认安装到当前用户的 `%LOCALAPPDATA%\\Programs\\JujinWritingStudio`，不需要管理员权限。
 
 ## 限制
 

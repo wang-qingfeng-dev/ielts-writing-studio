@@ -162,3 +162,24 @@ test('switches the selected provider through the local-only endpoint', async t =
   const invalid = await fetch(`${base}/api/provider`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({provider:'invalid'}) });
   assert.equal(invalid.status,400);
 });
+
+test('local AI setup endpoints expose only the injected manager lifecycle', async t => {
+  const calls = [];
+  const localAI = {
+    getStatus: async () => ({ supported: true, busy: false, phase: 'idle', message: 'ready' }),
+    start: () => { calls.push('start'); return { supported: true, busy: true, phase: 'checking' }; },
+    cancel: () => { calls.push('cancel'); return { supported: true, busy: false, phase: 'cancelled' }; },
+    getProviderConfig: () => null,
+    close: async () => {},
+  };
+  const base = await withServer(t, { localAI });
+  const info = await fetch(`${base}/api/app-info`);
+  assert.equal((await info.json()).app, 'ielts-writing-studio');
+  const start = await fetch(`${base}/api/local-ai/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  assert.equal(start.status, 202);
+  assert.deepEqual(calls, ['start']);
+  const cancel = await fetch(`${base}/api/local-ai/cancel`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  assert.equal(cancel.status, 200);
+  assert.deepEqual(calls, ['start', 'cancel']);
+  assert.equal((await fetch(`${base}/api/local-ai/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '[]' })).status, 400);
+});

@@ -1,5 +1,6 @@
 import { DEMO_PROMPT, DEMO_ESSAY, DEMO_ANALYSIS } from './demo.js';
 import { escapeHtml as e, countWords, formatBand, formatRange, annotate, issueAnnotation, normalizeAnswer, makeCardId, nextReview } from './utils.js';
+import { initLocalAiSetup } from './local-ai-setup.js';
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -61,6 +62,8 @@ let connection = { available:false, checked:false };
 let providerInfo = { provider:'unknown', selected:'auto' };
 let providerSwitching = false;
 let connectionRequest = 0;
+// 准备本地模型时锁住分析入口，避免下载和写作分析同时占用服务。
+let localAiBusy = false;
 
 function toast(message) {
   clearTimeout(toastTimer);
@@ -146,14 +149,14 @@ function renderAnalysis() {
   ['copy-corrected','copy-model','rewrite'].forEach(action => $(`[data-action="${action}"]`).disabled = !a || state.busy);
   $('#model-toggle').disabled = !a || state.busy;
   $('#export-button').disabled = !a || state.busy;
-  $('#analyze-button').disabled = state.busy;
+  $('#analyze-button').disabled = state.busy || localAiBusy;
   $('#analyze-button').classList.toggle('hidden', state.busy);
   $('#cancel-button').classList.toggle('hidden', !state.busy);
   $('#prompt-input').readOnly = state.busy;
   $('#essay-input').readOnly = state.busy;
   $('#target-band').disabled = state.busy;
-  $$('[data-action="new"], [data-action="demo"], [data-action="history"], [data-action="analyze"]').forEach(button=>button.disabled=state.busy || providerSwitching);
-  $('#provider-select').disabled = state.busy || providerSwitching;
+  $$('[data-action="new"], [data-action="demo"], [data-action="history"], [data-action="analyze"]').forEach(button=>button.disabled=state.busy || providerSwitching || localAiBusy);
+  $('#provider-select').disabled = state.busy || providerSwitching || localAiBusy;
   renderPriorities();
   renderReview();
 }
@@ -473,3 +476,17 @@ document.addEventListener('keydown',event=>{
 renderAll();
 setMobileTab('original');
 checkConnection();
+initLocalAiSetup({
+  // 供本地 AI 卡片判断是否正在分析；卡片自身不维护作文状态。
+  isAnalyzing: () => state.busy,
+  onStateChange: status => {
+    localAiBusy = Boolean(status.busy);
+    renderAnalysis();
+  },
+  onReady: async () => {
+    localAiBusy = false;
+    // 管理器使用独立端口；通过本地接口切换后端，避免误连系统中的其他 Ollama。
+    await switchProvider('ollama');
+    renderAnalysis();
+  },
+});

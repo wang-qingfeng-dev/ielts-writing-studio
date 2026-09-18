@@ -1,6 +1,7 @@
 param(
+    [string]$SourceRef = 'main',
     [ValidatePattern('^v\d+\.\d+\.\d+$')]
-    [string]$SourceRef = 'v0.1.0',
+    [string]$ReleaseVersion = 'v0.1.1',
     [ValidatePattern('^v24\.\d+\.\d+$')]
     [string]$NodeVersion = 'v24.19.0'
 )
@@ -16,7 +17,7 @@ if ($LASTEXITCODE -ne 0) { throw 'The source tag could not be resolved.' }
 $artifactRoot = Join-Path $projectRoot 'release-artifacts'
 New-Item -ItemType Directory -Path $artifactRoot -Force | Out-Null
 $buildRoot = Join-Path $artifactRoot ('portable-build-' + [guid]::NewGuid().ToString('N'))
-$packageName = "ielts-writing-studio-$SourceRef-windows-x64"
+$packageName = "ielts-writing-studio-$ReleaseVersion-windows-x64"
 $packageRoot = Join-Path $buildRoot $packageName
 New-Item -ItemType Directory -Path $packageRoot -Force | Out-Null
 $sourceZip = Join-Path $buildRoot 'application-source.zip'
@@ -60,6 +61,9 @@ $wrapper = $wrapperSource.Replace('@NODE_DIRECTORY@', $nodeDirectory)
 $wrapper = $wrapper -replace '\r?\n', "`r`n"
 [IO.File]::WriteAllText((Join-Path $packageRoot 'Start Portable.cmd'), $wrapper, [Text.Encoding]::ASCII)
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README.portable.zh-CN.md') -Destination (Join-Path $packageRoot 'README.portable.zh-CN.md')
+$readmePath = Join-Path $packageRoot 'README.portable.zh-CN.md'
+$readme = [IO.File]::ReadAllText($readmePath).Replace('v0.1.0', $ReleaseVersion)
+[IO.File]::WriteAllText($readmePath, $readme, $utf8)
 
 # 清单记录来源与哈希；源码全量校验可对照 SourceCommit 重新运行 git archive。
 $manifest = [ordered]@{
@@ -80,7 +84,7 @@ $manifest = [ordered]@{
         CompleteOfficialDistribution = $true
         FileCount = @(Get-ChildItem -LiteralPath $runtimeDirectory -Recurse -File).Count
         License = "runtime/$nodeDirectory/LICENSE"
-    }
+    };
     AdditionalFiles = @('Start Portable.cmd', 'README.portable.zh-CN.md', 'PORTABLE-MANIFEST.json', "runtime/SHASUMS256-$NodeVersion.txt")
     LauncherSHA256 = (Get-FileHash -LiteralPath (Join-Path $packageRoot 'Start Portable.cmd') -Algorithm SHA256).Hash.ToLowerInvariant()
     ContainsAIModel = $false

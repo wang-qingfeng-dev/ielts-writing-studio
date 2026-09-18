@@ -1,6 +1,6 @@
 # 句进 · 雅思写作工作台
 
-[English](README.en.md) · [下载 v0.1.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.1.0) · [更新记录](CHANGELOG.md)
+[English](README.en.md) · [下载 v0.1.1](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.1.1) · [更新记录](CHANGELOG.md)
 
 一个面向中文学习者的 IELTS Writing Task 2 本机学习工具。通过「我的原文 → 保留原意的精修 → 独立范文」三栏对照，把批改转化成可以复习、造句和迁移的学习卡片。
 
@@ -27,6 +27,14 @@
 3. 双击解压目录中的 `Start Portable.cmd`，打开本机网页。
 
 便携版已附带 Node.js，无需单独安装 Node。**不包含 AI 模型**：打开后可以立即体验标明为示例的完整教学内容；批改自己的作文还需要配置下方任意一种 AI 服务。此下载包适用于 Windows x64。
+
+### Windows：小白一键安装（推荐）
+
+下载 [句进 v0.1.1 一键安装程序](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.1.1/ielts-writing-studio-v0.1.1-windows-x64-setup.exe)，双击安装程序，按中文向导点击下一步即可。安装结束会自动打开「一键准备本地 AI」页面，不需要安装 Node.js、npm 或手动配置环境。
+
+点击「一键准备本地 AI」后，程序会自动下载并校验 Ollama，准备 Qwen2.5 本地模型，显示下载进度并进行真实连接检查。首次需要联网下载几个 GB，准备完成后可以离线使用；模型保存在自己的电脑上，作文不会自动发送给陌生公共网站。
+
+安装器会根据电脑内存选择 7B 或 3B 模型，并在空间不足、下载失败或系统不支持时给出中文提示。可随时重试或取消，整个过程不需要打开命令行。AI 估分是练习参考，不代表雅思官方成绩。
 
 ### 从源码运行（Windows / macOS / Linux）
 
@@ -72,7 +80,7 @@ Codex 模式需要你自己安装、登录 CLI，使用你自己的账号额度�
 
 提交分析时，题目与作文会发送给所选服务。默认本机 Ollama 推理留在电脑上；外部 API、远程 Ollama 地址和 Codex 会涉及相应服务。密钥只放服务端 `.env`，不要写到网页代码中。
 
-v0.1.0 只支持 Task 2；不包含云同步、多人账号、Task 1 或在线免费推理服务。公开源码和 GitHub Release 不等于部署了可直接在线批改的网站。当前服务器只监听本机地址，请勿直接当成公网多人服务部署。
+v0.1.1 只支持 Task 2；不包含云同步、多人账号、Task 1 或在线免费推理服务。公开源码和 GitHub Release 不等于部署了可直接在线批改的网站。当前服务器只监听本机地址，请勿直接当成公网多人服务部署。
 
 ## 测试与贡献
 
@@ -80,7 +88,7 @@ v0.1.0 只支持 Task 2；不包含云同步、多人账号、Task 1 或在线�
 node --test tests/*.test.mjs
 ```
 
-v0.1.0 已通过 56 项自动化测试，GitHub Actions 在 Node 22、24 上运行测试。详细范围见 [首发验证记录](docs/release-verification-v0.1.0.md)。`tests/live-check.mjs` 是可选真实模型检查，会使用当前服务的算力或额度；模拟接口测试不能证明实际模型评分质量。
+v0.1.1 已通过自动化测试，GitHub Actions 在 Node 22、24 上运行测试。`tests/live-check.mjs` 是可选真实模型检查，会使用当前服务的算力或额度；模拟接口测试不能证明实际模型评分质量。
 
 欢迎提交问题和修复，报告时说明系统、Node 版本、所用 AI 类型和复现步骤；不要附真实 API key 或不愿公开的作文。
 

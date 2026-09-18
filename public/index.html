@@ -38,6 +38,29 @@
     </section>
     <div id="notice" class="notice-banner hidden" role="status"></div>
     <div id="error" class="error-banner hidden" role="alert"></div>
+    <section class="local-ai-setup hidden" id="local-ai-setup" aria-labelledby="local-ai-setup-title">
+      <div class="local-ai-setup-main">
+        <div class="local-ai-setup-icon" aria-hidden="true"><span data-icon="spark"></span></div>
+        <div class="local-ai-setup-copy">
+          <p class="eyebrow">第一次使用</p>
+          <h2 id="local-ai-setup-title">一键准备本地 AI</h2>
+          <p id="local-ai-setup-message">点击后会自动检查并准备本机 AI。首次需要联网下载几个 GB，完成后可以离线使用。</p>
+          <p class="local-ai-setup-note">模型效果取决于电脑配置，AI 评分仅供练习参考，不代表官方成绩。</p>
+        </div>
+      </div>
+      <div class="local-ai-setup-status" id="local-ai-setup-status" role="status" aria-live="polite">
+        <div class="local-ai-setup-progress-row"><span id="local-ai-setup-phase">尚未准备</span><span id="local-ai-setup-percent">—</span></div>
+        <div class="local-ai-progress" aria-hidden="true"><span id="local-ai-setup-progress-bar"></span></div>
+        <div class="local-ai-setup-meta"><span id="local-ai-setup-bytes"></span><span id="local-ai-setup-model"></span></div>
+        <p class="local-ai-setup-error hidden" id="local-ai-setup-error"></p>
+      </div>
+      <div class="local-ai-setup-actions">
+        <button class="btn btn-primary" id="local-ai-setup-start" data-action="prepare-local-ai"><span data-icon="spark"></span>一键准备本地 AI</button>
+        <button class="btn btn-secondary hidden" id="local-ai-setup-cancel" data-action="cancel-local-ai">取消准备</button>
+        <button class="btn btn-primary hidden" id="local-ai-setup-ready" data-action="start-writing"><span data-icon="arrow"></span>准备好了，开始写作</button>
+        <button class="btn btn-secondary hidden" id="local-ai-setup-retry" data-action="retry-local-ai"><span data-icon="refresh"></span>重试</button>
+      </div>
+    </section>
     <div class="workspace-toolbar"><div class="mode-info"><span class="mode-badge" id="mode-label">开始一篇新练习</span><span class="saved-indicator" id="save-state">草稿自动保存在本机</span></div><div class="toolbar-actions"><button class="btn btn-ghost btn-small" data-action="new"><span data-icon="plus"></span>新练习</button><button class="btn btn-primary" id="analyze-button" data-action="analyze"><span data-icon="spark"></span>开始分析<span aria-hidden="true">↗</span></button><button class="btn btn-secondary hidden" id="cancel-button" data-action="cancel">停止分析</button></div></div>
     <div class="mobile-tabs" role="tablist" aria-label="作文对照"><button class="mobile-tab active" role="tab" aria-selected="true" aria-controls="original-panel" data-tab="original">01 我的原文</button><button class="mobile-tab" role="tab" aria-selected="false" aria-controls="corrected-panel" data-tab="corrected">02 精修版本</button><button class="mobile-tab" role="tab" aria-selected="false" aria-controls="model-panel" data-tab="model">03 高分范文</button></div>
     <section class="workspace-grid" aria-label="三栏作文学习工作台">
@@ -65,7 +88,7 @@
       <div class="section-heading"><div><p class="eyebrow">MAKE IT YOURS</p><h2 id="review-heading">读懂了，还要用得出来。</h2><p class="section-description">把这次的错误和好表达，带到下一道题里。</p></div><div class="section-actions"><button class="btn btn-secondary btn-small" data-action="export" id="export-button" disabled><span data-icon="download"></span>导出学习笔记</button></div></div>
       <div class="review-grid"><section class="review-column"><div class="review-column-heading"><h3><span data-icon="target"></span>我的易错点</h3><span class="review-count" id="errors-total">00</span></div><div id="review-errors"></div></section><section class="review-column"><div class="review-column-heading"><h3><span data-icon="link"></span>实用搭配</h3><span class="review-count" id="phrases-total">00</span></div><div id="review-phrases"></div></section><section class="review-column"><div class="review-column-heading"><h3><span data-icon="lightbulb"></span>好句与论证</h3><span class="review-count" id="notes-total">00</span></div><div id="review-notes"></div></section></div>
     </section>
-    <footer class="page-footer"><span>句进 · 一句一句，向前一步。 · v0.1.0</span><button class="text-button" data-action="about">评分说明与使用方法 <span aria-hidden="true">↗</span></button></footer>
+    <footer class="page-footer"><span>句进 · 一句一句，向前一步。 · v0.1.1</span><button class="text-button" data-action="about">评分说明与使用方法 <span aria-hidden="true">↗</span></button></footer>
   </main>
   <div id="modal-root"></div><div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 </body>

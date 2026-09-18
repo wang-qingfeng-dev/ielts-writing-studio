@@ -1,19 +1,21 @@
 param(
-    [int]$Port = 4325
+    [int]$Port = 4325,
+    [ValidatePattern('^v\d+\.\d+\.\d+$')]
+    [string]$ReleaseVersion = 'v0.1.1'
 )
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $projectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $artifactRoot = Join-Path $projectRoot 'release-artifacts'
-$archivePath = Join-Path $artifactRoot 'ielts-writing-studio-v0.1.0-windows-x64.zip'
+$archivePath = Join-Path $artifactRoot "ielts-writing-studio-$ReleaseVersion-windows-x64.zip"
 if (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue) { throw 'The test port is already in use.' }
 
 # 必须测试最终 ZIP 的解压副本，且测试日志不能回流到发布包。
 $testRoot = Join-Path $artifactRoot ('免安装 验证 ' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $testRoot -Force | Out-Null
 [IO.Compression.ZipFile]::ExtractToDirectory($archivePath, $testRoot)
-$packageRoot = Join-Path $testRoot 'ielts-writing-studio-v0.1.0-windows-x64'
+$packageRoot = Join-Path $testRoot "ielts-writing-studio-$ReleaseVersion-windows-x64"
 $manifest = Get-Content -LiteralPath (Join-Path $packageRoot 'PORTABLE-MANIFEST.json') -Raw | ConvertFrom-Json
 $expectedNode = Join-Path $packageRoot "runtime\node-$($manifest.Runtime.Version)-win-x64\node.exe"
 $trackedFiles = @(& git -C $projectRoot -c core.quotepath=false ls-tree -r --name-only $manifest.SourceRef)

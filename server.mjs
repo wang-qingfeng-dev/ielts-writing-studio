@@ -6,6 +6,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { correctionSchema, modelSchema, validateCorrection, validateModel, validateAnalysis, validateRequest, ValidationError } from './analysis-schema.mjs';
 import { resolveProvider, getProviderStatus, setProviderOverride, getProviderOverride, completeJson, ProviderError } from './provider.mjs';
+import { createLocalAIManager } from './local-ai.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -170,10 +171,11 @@ function assertLocalRequest(req) {
   if (req.headers['sec-fetch-site'] === 'cross-site') throw new HttpError(403, '不接受跨站请求。');
 }
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2' };
-export function createServer({ analyze = analyzeWriting, status = getEngineStatus, publicDir = PUBLIC } = {}) {
+export function createServer({ analyze = analyzeWriting, status = getEngineStatus, publicDir = PUBLIC, localAI: localAIOverride } = {}) {
   let busy = false;
   let switching = false;
-  return http.createServer(async (req, res) => {
+  const localAI = localAIOverride || createLocalAIManager();
+  const server = http.createServer(async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
@@ -182,12 +184,34 @@ export function createServer({ analyze = analyzeWriting, status = getEngineStatu
       const url = new URL(req.url, `http://${req.headers.host}`);
       if (url.pathname === '/api/status' && req.method === 'GET') return sendJson(res, 200, await status());
       if (url.pathname === '/api/provider' && req.method === 'GET') return sendJson(res, 200, await status());
+      if (url.pathname === '/api/app-info' && req.method === 'GET') return sendJson(res, 200, { app: 'ielts-writing-studio', version: '0.1.1', pid: process.pid });
+      if (url.pathname === '/api/local-ai/status' && req.method === 'GET') return sendJson(res, 200, await localAI.getStatus());
+      if (url.pathname === '/api/local-ai/start' && req.method === 'POST') {
+        if (!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] || '')) throw new HttpError(415, '请使用 JSON 格式提交。');
+        if (busy || switching) throw new HttpError(409, '正在分析或切换 AI，请完成后再准备本地 AI。');
+        const setupBody = await readBody(req);
+        if (!setupBody || Array.isArray(setupBody) || typeof setupBody !== 'object') throw new HttpError(400, '准备本地 AI 的请求格式无效。');
+        return sendJson(res, 202, localAI.start());
+      }
+      if (url.pathname === '/api/local-ai/cancel' && req.method === 'POST') {
+        if (!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] || '')) throw new HttpError(415, '请使用 JSON 格式提交。');
+        const cancelBody = await readBody(req);
+        if (!cancelBody || Array.isArray(cancelBody) || typeof cancelBody !== 'object') throw new HttpError(400, '取消本地 AI 的请求格式无效。');
+        return sendJson(res, 200, localAI.cancel());
+      }
       if (url.pathname === '/api/provider' && req.method === 'POST') {
         if (!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] || '')) throw new HttpError(415, '请使用 JSON 格式提交。');
         if (busy || switching) throw new HttpError(409, '正在分析或切换 AI，请完成后再切换。');
         switching = true;
         try {
           const body = await readBody(req);
+          if (body?.provider === 'ollama') {
+            const localConfig = localAI.getProviderConfig();
+            if (localConfig) {
+              process.env.OLLAMA_HOST = localConfig.url;
+              process.env.OLLAMA_MODEL = localConfig.model;
+            }
+          }
           setProviderOverride(body?.provider);
           return sendJson(res, 200, await status());
         } finally { switching = false; }
@@ -226,6 +250,8 @@ export function createServer({ analyze = analyzeWriting, status = getEngineStatu
       if (!res.destroyed && !res.headersSent) sendJson(res, error instanceof ValidationError ? 400 : error.status || 500, { error: error instanceof ValidationError || error instanceof HttpError || error instanceof ProviderError ? error.message : '服务出现异常，请刷新后重试。' });
     }
   });
+  server.on('close', () => { void localAI.close(); });
+  return server;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

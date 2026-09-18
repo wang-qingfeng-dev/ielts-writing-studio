@@ -461,6 +461,40 @@ h1 > span { color: #7d9170; }
 .error-banner, .notice-banner { display: flex; align-items: flex-start; gap: 10px; margin: 15px 0; padding: 12px 16px; border: 1px solid #edd6cb; border-radius: 9px; background: #fcf1eb; color: #9c6956; font-size: 11px; line-height: 1.8; }
 .notice-banner { background: #f4f5e9; border-color: #e1e4cf; color: #85846b; }
 .error-banner .icon, .notice-banner .icon { margin-top: 2px; width: 15px; height: 15px; }
+
+/* 小白模式：把模型准备集中在一个可读、可取消的卡片里。 */
+.local-ai-setup {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(220px, 1fr) auto;
+  align-items: center;
+  gap: 22px;
+  margin: 17px 0 5px;
+  padding: 19px 21px;
+  border: 1px solid #d8e3cf;
+  border-radius: 13px;
+  background: linear-gradient(120deg, #f2f7ed, #fbfcf8 70%);
+  box-shadow: 0 3px 12px rgb(39 55 41 / 3%);
+}
+.local-ai-setup.is-ready { border-color: #bcd2b1; background: linear-gradient(120deg, #eef7e9, #fbfcf8 70%); }
+.local-ai-setup.has-error { border-color: #e7c9c0; background: linear-gradient(120deg, #fff5f1, #fbfcf8 70%); }
+.local-ai-setup-main { display: flex; align-items: flex-start; gap: 13px; min-width: 0; }
+.local-ai-setup-icon { display: grid; place-items: center; flex: 0 0 35px; width: 35px; height: 35px; border-radius: 10px; background: #dcead3; color: var(--green); }
+.local-ai-setup-icon .icon { width: 18px; height: 18px; }
+.local-ai-setup-copy .eyebrow { margin-bottom: 1px; font-size: 10px; }
+.local-ai-setup-copy h2 { color: var(--ink); font-size: 16px; font-weight: 650; letter-spacing: -.2px; }
+.local-ai-setup-copy p:not(.eyebrow) { margin-top: 4px; color: #697766; font-size: 12px; line-height: 1.7; }
+.local-ai-setup-copy .local-ai-setup-note { color: #879281; font-size: 11px; }
+.local-ai-setup-status { min-width: 0; }
+.local-ai-setup-progress-row, .local-ai-setup-meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: #657562; font-size: 11px; }
+.local-ai-setup-progress-row { color: var(--green); font-weight: 600; }
+.local-ai-progress { height: 7px; margin: 8px 0 7px; overflow: hidden; border-radius: 99px; background: #e3eade; }
+.local-ai-progress > span { display: block; width: 0; height: 100%; border-radius: inherit; background: var(--green); transition: width .35s ease; }
+.local-ai-progress.is-indeterminate > span { width: 42%; animation: local-ai-progress 1.4s ease-in-out infinite; }
+@keyframes local-ai-progress { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+.local-ai-setup-meta { justify-content: flex-start; flex-wrap: wrap; color: #8a9683; font-size: 10px; }
+.local-ai-setup-error { margin-top: 7px; color: #a5534b; font-size: 11px; line-height: 1.6; }
+.local-ai-setup-actions { display: flex; justify-content: flex-end; gap: 7px; flex-wrap: wrap; }
+.local-ai-setup-actions .btn { min-width: 108px; }
 .under-workspace { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 13px 3px 0; }
 .estimate-disclaimer { color: #a3ab96; font-size: 11px; text-align: right; }
 
@@ -662,6 +696,8 @@ h1 > span { color: #7d9170; }
   #review-notes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; align-items: start; }
   #review-notes > .empty-state, #review-notes > .review-empty { grid-column: 1 / -1; }
   .review-card { padding: 17px 18px 13px; }
+  .local-ai-setup { grid-template-columns: minmax(0, 1.35fr) minmax(190px, 1fr); }
+  .local-ai-setup-actions { grid-column: 1 / -1; justify-content: flex-start; }
 }
 
 @media (max-width: 639px) {
@@ -690,6 +726,9 @@ h1 > span { color: #7d9170; }
   .prompt-footer { flex-wrap: wrap; gap: 10px 13px; }
   .prompt-hint { width: 100%; max-width: none; text-align: left; font-size: 11px; margin-left: 0; }
   .workspace-toolbar { margin-top: 17px; gap: 10px; }
+  .local-ai-setup { grid-template-columns: 1fr; gap: 14px; margin-top: 14px; padding: 17px; }
+  .local-ai-setup-actions { grid-column: auto; justify-content: flex-start; }
+  .local-ai-setup-actions .btn { flex: 1 1 130px; }
   .mode-info { font-size: 11px; gap: 5px; }
   .mode-info strong { font-size: 11px; }
   .saved-indicator { display: none; }

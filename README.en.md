@@ -1,6 +1,6 @@
 # IELTS Writing Studio · 句进
 
-[简体中文](README.md) · [Download v0.1.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.1.0) · [Changelog](CHANGELOG.md)
+[简体中文](README.md) · [Download v0.1.1](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.1.1) · [Changelog](CHANGELOG.md)
 
 A local IELTS Writing Task 2 practice app that turns essay feedback into reusable learning cards. Compare your draft, a minimally corrected version, and an independently generated model essay, then practise the language you want to retain.
 
@@ -19,9 +19,15 @@ Click a highlight to see the source, revision, explanation and a short exercise.
 
 ## Run locally
 
+### Windows one-click installer (recommended)
+
+Download [Jujin v0.1.1 Windows x64 installer](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.1.1/ielts-writing-studio-v0.1.1-windows-x64-setup.exe), run it, and follow the Chinese setup wizard. The installer includes Node.js, needs no administrator permission, and opens the first-run local AI setup page after installation. The setup page downloads and verifies Ollama and a suitable Qwen2.5 model, shows progress, and provides retry and cancel actions.
+
+The first model download needs an internet connection and several GB of disk space. The model is stored on the user's computer; the installer does not contain model weights. After setup, users can start the app from the desktop shortcut without opening a terminal.
+
 ### Windows portable download
 
-Download [ielts-writing-studio-v0.1.0-windows-x64.zip](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.1.0/ielts-writing-studio-v0.1.0-windows-x64.zip), extract the entire archive, then double-click `Start Portable.cmd`. The Windows x64 package includes Node.js, so no separate Node installation is needed. **AI models are not bundled:** the labelled example is available immediately; real analysis requires a provider configured below.
+Download [ielts-writing-studio-v0.1.1-windows-x64.zip](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.1.1/ielts-writing-studio-v0.1.1-windows-x64.zip), extract the entire archive, then double-click `Start Portable.cmd`. The Windows x64 package includes Node.js, so no separate Node installation is needed. **AI models are not bundled:** the labelled example is available immediately; real analysis requires the first-run local AI setup or another provider configured below.
 
 ### Run from source (Windows, macOS or Linux)
 
@@ -83,7 +89,7 @@ The header selects a provider for the current server session. **Auto** prefers a
 - Submitted writing goes to the selected provider. With the default loopback Ollama configuration, inference stays local. An external API, remote Ollama host or Codex service receives the relevant content under its own terms.
 - Correction and model-essay generation use separate requests. The model-essay request omits the student's draft. Outputs must pass score, structure and exact quotation checks; failures never silently substitute demo feedback.
 - Keys, local logs and live test results are ignored by Git. Never put credentials in `public/`.
-- v0.1.0 covers Task 2 only. It does not include Task 1, cloud sync, accounts, a public inference service, or validated prediction of official bands. GitHub Releases distributes code; it does not host the Node backend.
+- v0.1.1 covers Task 2 only. It does not include Task 1, cloud sync, accounts, a public inference service, or validated prediction of official bands. GitHub Releases distributes code and installers; it does not host the Node backend.
 
 See [Security](SECURITY.md), [third-party boundaries](THIRD_PARTY_NOTICES.md) and [verification](docs/release-verification-v0.1.0.md).
 
@@ -93,7 +99,7 @@ See [Security](SECURITY.md), [third-party boundaries](THIRD_PARTY_NOTICES.md) an
 node --test tests/*.test.mjs
 ```
 
-The v0.1.0 release passed 56 automated tests. The suite covers request boundaries, annotation validation, independent model context, provider selection, mocked HTTP integrations, cancellation, rendering safety and draft/review state. CI runs on Node 22 and 24.
+The v0.1.1 release passed 63 automated tests. The suite covers request boundaries, annotation validation, independent model context, provider selection, local AI setup lifecycle, mocked HTTP integrations, cancellation, rendering safety and draft/review state. CI runs on Node 22 and 24.
 
 An optional live check submits the included test essay to a running configured service and may use account quota:
 

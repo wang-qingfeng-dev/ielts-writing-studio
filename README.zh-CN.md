@@ -22,7 +22,7 @@
 
 ### Windows：下载便携版
 
-1. 下载 [句进 v0.1.0 Windows x64 便携版 ZIP](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.1.0/ielts-writing-studio-v0.1.0-windows-x64.zip)。
+1. 下载 [句进 v0.1.1 Windows x64 便携版 ZIP](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.1.1/ielts-writing-studio-v0.1.1-windows-x64.zip)。
 2. **先完整解压**到一个文件夹，不要在压缩包里直接运行。
 3. 双击解压目录中的 `Start Portable.cmd`，打开本机网页。
 

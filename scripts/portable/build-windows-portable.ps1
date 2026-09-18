@@ -84,7 +84,7 @@ $manifest = [ordered]@{
         CompleteOfficialDistribution = $true
         FileCount = @(Get-ChildItem -LiteralPath $runtimeDirectory -Recurse -File).Count
         License = "runtime/$nodeDirectory/LICENSE"
-    };
+    }
     AdditionalFiles = @('Start Portable.cmd', 'README.portable.zh-CN.md', 'PORTABLE-MANIFEST.json', "runtime/SHASUMS256-$NodeVersion.txt")
     LauncherSHA256 = (Get-FileHash -LiteralPath (Join-Path $packageRoot 'Start Portable.cmd') -Algorithm SHA256).Hash.ToLowerInvariant()
     ContainsAIModel = $false

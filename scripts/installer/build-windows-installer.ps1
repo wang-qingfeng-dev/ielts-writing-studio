@@ -59,6 +59,7 @@ $sourceManifest = Get-Content -LiteralPath (Join-Path $sourceRoot 'PORTABLE-MANI
 if ($sourceManifest.SourceCommit -ne $sourceCommit) { throw '便携包来源提交与目标提交不一致。' }
 $sourceManifest.Runtime.CompleteOfficialDistribution = $false
 $sourceManifest.Runtime | Add-Member -NotePropertyName OmittedFiles -NotePropertyValue @('node_modules/', 'npm', 'npx', 'corepack', 'corepack.cmd', 'install_tools.bat', 'nodevars.bat')
+$sourceManifest.Runtime.FileCount = @(Get-ChildItem -LiteralPath $installerNodeRoot -Recurse -File).Count
 
 # 优先使用 PATH 中的 ISCC；没有时把官方安装程序放在仓库外的隔离工具目录。
 $iscc = Get-Command ISCC.exe -ErrorAction SilentlyContinue

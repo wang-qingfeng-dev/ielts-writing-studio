@@ -20,7 +20,7 @@
 
 ## 版本和隐私
 
-本包标记为 `@RELEASE_VERSION@`，实际应用源码由 [PORTABLE-MANIFEST.json](PORTABLE-MANIFEST.json) 中的 `SourceCommit` 标识，不要求存在同名 Git 标签。候选安装包需通过验收后再发布。启动器仅临时把随包 Node 加入当前进程 PATH，不修改系统配置；清单还记录启动器哈希、运行时版本、来源网址及校验值。
+本包标记为 `@RELEASE_VERSION@`，实际应用源码由 [PORTABLE-MANIFEST.json](PORTABLE-MANIFEST.json) 中的 `SourceCommit` 标识，正式发行包对应同名 Git 标签。启动器仅临时把随包 Node 加入当前进程 PATH，不修改系统配置；清单还记录启动器哈希、运行时版本、来源网址及校验值。
 
 Node 原始发行包完整保留在 `runtime/` 下，包括 LICENSE、README、npm 及其依赖许可；`npm install` 不需要执行。项目 MIT 许可证不替代 Node 和模型各自的许可证。
 

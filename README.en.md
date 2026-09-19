@@ -1,8 +1,8 @@
 # IELTS Writing Studio · 句进
 
-[简体中文](README.md) · [Download v0.1.1](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.1.1) · [Changelog](CHANGELOG.md)
+[简体中文](README.md) · [Download v0.1.2](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.1.2) · [Changelog](CHANGELOG.md)
 
-This working copy is a **local v0.1.2 candidate, not a published release**. Public download links still point to v0.1.1. The online AI settings and reliability changes described below require the candidate build and are awaiting user acceptance before publication.
+**v0.1.2** adds browser-based online AI setup, improves local output validation and recovery, and offers on-demand Qwen3.5:4b preparation. Computers with limited resources can use online AI without downloading a local model.
 
 A local IELTS Writing Task 2 practice app that turns essay feedback into reusable learning cards. Compare your draft, a minimally corrected version, and an independently generated model essay, then practise the language you want to retain.
 
@@ -23,9 +23,9 @@ Click a highlight to see the source, revision, explanation and a short exercise.
 
 ### Windows one-click installer (recommended)
 
-The public download remains the [Jujin v0.1.1 Windows x64 installer](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.1.1/ielts-writing-studio-v0.1.1-windows-x64-setup.exe). It includes Node.js and a Chinese setup wizard and needs no administrator permission. That published package does not yet contain the v0.1.2 online settings or reliability fixes.
+Download the [Jujin v0.1.2 Windows x64 installer](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.1.2/ielts-writing-studio-v0.1.2-windows-x64-setup.exe). It includes Node.js and a Chinese setup wizard and needs no administrator permission.
 
-The v0.1.2 candidate first-run page offers a choice between online and local AI. It does not start a model download automatically. Clicking **一键准备本地 AI** explicitly starts Ollama download and verification, then prepares the recommended `qwen3.5:4b` model (approximately 3.4 GB). The Ollama runtime needs additional download and storage space; the setup page reports total requirements. Progress, retry and cancellation are available.
+The first-run page offers a choice between online and local AI. It does not start a model download automatically. Clicking **一键准备本地 AI** explicitly starts Ollama download and verification, then prepares the recommended `qwen3.5:4b` model (approximately 3.4 GB). The Ollama runtime needs additional download and storage space; the setup page reports total requirements. Progress, retry and cancellation are available.
 
 Automatic local preparation requires at least 12 GiB of detected system memory; 16 GB RAM and a discrete GPU are recommended. Below the threshold, the app recommends online AI rather than automatically installing a weaker 3B model. CPU-only analysis may take minutes or time out. Models are stored on the user's computer, not bundled in the installer. Users who prefer no model download can choose online AI below. A model connection check does not establish IELTS scoring accuracy.
 
@@ -33,7 +33,7 @@ Existing installations can restore their previously installed model without a fo
 
 ### Windows portable download
 
-Download [ielts-writing-studio-v0.1.1-windows-x64.zip](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.1.1/ielts-writing-studio-v0.1.1-windows-x64.zip), extract the entire archive, then double-click `Start Portable.cmd`. The Windows x64 package includes Node.js, so no separate Node installation is needed. **AI models are not bundled:** the labelled example is available immediately; real analysis requires the first-run local AI setup or another provider configured below.
+Download [ielts-writing-studio-v0.1.2-windows-x64.zip](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.1.2/ielts-writing-studio-v0.1.2-windows-x64.zip), extract the entire archive, then double-click `Start Portable.cmd`. The Windows x64 package includes Node.js, so no separate Node installation is needed. **AI models are not bundled:** the labelled example is available immediately; real analysis requires the first-run local AI setup or another provider configured below.
 
 ### Run from source (Windows, macOS or Linux)
 
@@ -61,7 +61,7 @@ Select **Ollama 本地** in the page header. Local inference needs no API key or
 
 To change models or configure an API, copy `.env.example` to `.env` (Windows: `Copy-Item .env.example .env`; macOS/Linux: `cp .env.example .env`), edit it and restart the server. Both `npm start` and the Windows launcher load this file. Existing shell variables take precedence.
 
-### Online AI without model downloads (v0.1.2 candidate)
+### Online AI without model downloads
 
 1. Click **设置在线 AI** and choose a provider.
 2. Follow the provider link, create an API key with your own account, and paste it into the settings. Supply a model name available to your account when required.
@@ -109,7 +109,7 @@ The optional **Codex CLI** choice uses your own installed, authenticated CLI and
 - Keys, local logs and live test results are ignored by Git. Never put credentials in `public/`.
 - The app covers Task 2 only. It does not include Task 1, cloud sync, accounts, a project-hosted inference service, or validated prediction of official bands. GitHub Releases distributes code and installers; it does not host the Node backend.
 
-See [Security](SECURITY.md), [third-party boundaries](THIRD_PARTY_NOTICES.md) and [v0.1.1 verification](docs/release-verification-v0.1.1.md).
+See [Security](SECURITY.md), [third-party boundaries](THIRD_PARTY_NOTICES.md) and [v0.1.2 verification](docs/release-verification-v0.1.2.md).
 
 ## Development
 
@@ -117,7 +117,7 @@ See [Security](SECURITY.md), [third-party boundaries](THIRD_PARTY_NOTICES.md) an
 node --test tests/*.test.mjs
 ```
 
-The v0.1.1 release passed 63 automated tests; that is a historical release result, not a validation claim for v0.1.2. The local v0.1.2 candidate is awaiting user acceptance and has not undergone a GitHub release workflow. The suite covers request boundaries, annotation validation, independent model context, provider selection, local AI setup lifecycle, mocked HTTP integrations, cancellation, rendering safety and draft/review state. CI is configured for Node 22 and 24. Mocked tests and connection probes do not establish IELTS scoring accuracy.
+v0.1.2 passed 133 automated tests, two live Qwen3.5:4b essay analyses, and an isolated Windows installation test. The suite covers request boundaries, annotation validation, independent model context, provider selection, local AI setup lifecycle, mocked HTTP integrations, cancellation, rendering safety and draft/review state. Cloud adapters were checked with isolated mock services; real cloud-account essay analysis has not been verified. CI is configured for Node 22 and 24. These checks do not establish IELTS scoring accuracy or guarantee success for every essay.
 
 An optional live check submits the included test essay to a running configured service and may use account quota:
 

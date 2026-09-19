@@ -24,7 +24,7 @@ powershell -ExecutionPolicy Bypass -File scripts/installer/build-windows-install
   -SourceRef main -ReleaseVersion v0.1.2
 ```
 
-`v0.1.2` 当前为候选版本，构建不代表已发布。`-SourceRef` 可以是分支、标签或完整提交。实际源码以发行清单中的 `SourceCommit` 为准，不要求预先创建同名标签。脚本会核对便携包来源；如果系统没有 `ISCC.exe`，会把官方 Inno Setup 编译器准备在仓库内被 Git 忽略的 `.tools\inno` 工具目录。
+`-SourceRef` 可以是分支、标签或完整提交；正式发行包应与同名 Git 标签一致。实际源码以发行清单中的 `SourceCommit` 为准，构建本身不会上传或发布。脚本会核对便携包来源；如果系统没有 `ISCC.exe`，会把官方 Inno Setup 编译器准备在仓库内被 Git 忽略的 `.tools\inno` 工具目录。
 
 ## 隔离测试
 

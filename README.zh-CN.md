@@ -1,8 +1,8 @@
 # 句进 · 雅思写作工作台
 
-[English](README.en.md) · [下载 v0.1.1](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.1.1) · [更新记录](CHANGELOG.md)
+[English](README.en.md) · [下载 v0.1.2](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.1.2) · [更新记录](CHANGELOG.md)
 
-当前工作区为 **v0.1.2 本地候选版本，尚未发布**。上方及下文的公开下载仍是 v0.1.1；在线 AI 设置和本次可靠性修复需在候选版中体验，用户验收后再发布。
+**v0.1.2** 新增网页在线 AI 设置，改进本地模型输出校验与恢复，并支持按需准备 Qwen3.5:4b。低配置电脑可选择在线 AI，无需下载本地模型。
 
 一个面向中文学习者的 IELTS Writing Task 2 本机学习工具。通过「我的原文 → 保留原意的精修 → 独立范文」三栏对照，把批改转化成可以复习、造句和迁移的学习卡片。
 
@@ -19,14 +19,14 @@
 - 每篇优先解决三个问题，并整理错误、搭配、好句与论证方法。
 - 收藏后按 1、3、7、14、30 天复习，保存最多 30 篇练习，导出 Markdown 学习笔记。
 - 右上角选择「自动 / Ollama 本地 / 在线 AI / Codex CLI」，分析或连接测试中禁止切换。
-- 候选版提供在线 AI 设置：选择服务商、输入自己的密钥，测试成功后保存；无需编辑配置文件或下载本地模型。
+- 网页提供在线 AI 设置：选择服务商、输入自己的密钥，测试成功后保存；无需编辑配置文件或下载本地模型。
 - 正文与四项评分必须通过完整性检查；无法核实的高亮会省略并明确提示，失败或取消会保留原稿和之前完成的结果。
 
 ## 第一次使用
 
 ### Windows：下载便携版
 
-1. 下载 [句进 v0.1.1 Windows x64 便携版 ZIP](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.1.1/ielts-writing-studio-v0.1.1-windows-x64.zip)。
+1. 下载 [句进 v0.1.2 Windows x64 便携版 ZIP](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.1.2/ielts-writing-studio-v0.1.2-windows-x64.zip)。
 2. **先完整解压**到一个文件夹，不要在压缩包里直接运行。
 3. 双击解压目录中的 `Start Portable.cmd`，打开本机网页。
 
@@ -34,15 +34,15 @@
 
 ### Windows：小白一键安装（推荐）
 
-公开下载仍为 [句进 v0.1.1 一键安装程序](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.1.1/ielts-writing-studio-v0.1.1-windows-x64-setup.exe)，双击后按中文向导完成安装。安装程序自带 Node.js，不需要打开命令行。此公开安装包尚不包含 v0.1.2 的在线设置界面和修复。
+下载 [句进 v0.1.2 一键安装程序](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.1.2/ielts-writing-studio-v0.1.2-windows-x64-setup.exe)，双击后按中文向导完成安装。安装程序自带 Node.js，不需要打开命令行。
 
-v0.1.2 候选版首次启动先提供在线与本地两种选择，不会自动下载模型。只有点击「一键准备本地 AI」，才会下载并校验 Ollama、准备推荐模型 `qwen3.5:4b`（模型约 3.4 GB）并显示进度。Ollama 运行时另需下载和存储空间，完整准备所需空间以页面提示为准；完成后可以离线使用。
+首次启动先提供在线与本地两种选择，不会自动下载模型。只有点击「一键准备本地 AI」，才会下载并校验 Ollama、准备推荐模型 `qwen3.5:4b`（模型约 3.4 GB）并显示进度。Ollama 运行时另需下载和存储空间，完整准备所需空间以页面提示为准；完成后可以离线使用。
 
 自动准备要求本机可识别总内存至少 12 GiB，建议配备 16 GB 内存和独立显卡；低于门限会提示使用在线 AI，不会自动改装较弱的 3B 模型。仅使用 CPU 时，整篇批改可能需要数分钟甚至超时。准备过程支持重试与取消，不需要输入命令。模型连接检查不等于雅思评分准确率验证。
 
 升级应用后，原来已安装的模型可继续恢复使用，不会强制下载新模型。点击「更新推荐本地模型」才会准备新的推荐模型，旧模型文件会保留。
 
-### 无需下载模型：设置在线 AI（v0.1.2 候选版）
+### 无需下载模型：设置在线 AI
 
 1. 点击页面中的「设置在线 AI」，选择服务商。
 2. 点击服务商链接，使用自己的账号创建 API 密钥，再粘贴到设置中；按服务商要求填写可用模型名称。
@@ -107,7 +107,7 @@ Codex 模式需要你自己安装、登录 CLI，使用你自己的账号额度�
 node --test tests/*.test.mjs
 ```
 
-v0.1.1 的验证记录属于已发布历史。v0.1.2 当前是待用户验收的本地候选版，不代表已通过 GitHub 发布验证。项目配置 GitHub Actions 在 Node 22、24 上运行测试；`tests/live-check.mjs` 是可选真实模型检查，会使用当前服务的算力或额度。模拟接口测试和连接检查都不能证明雅思估分准确率。
+v0.1.2 通过 133 项自动测试、两篇 Qwen3.5:4b 真实模型批改和 Windows 隔离安装测试，详见 [版本验证记录](docs/release-verification-v0.1.2.md)。在线适配使用模拟服务验证，尚未验证真实云端账户的作文调用。项目配置 GitHub Actions 在 Node 22、24 上运行测试；`tests/live-check.mjs` 是可选真实模型检查，会使用当前服务的算力或额度。上述检查不能证明雅思估分准确率或每篇作文都能成功。
 
 欢迎提交问题和修复，报告时说明系统、Node 版本、所用 AI 类型和复现步骤；不要附真实 API key 或不愿公开的作文。
 

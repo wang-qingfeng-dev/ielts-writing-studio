@@ -1,6 +1,6 @@
 # Shared implementation contract
 
-This document describes the local v0.1.2 candidate; it is not a publication or release-validation claim. Public downloads remain v0.1.1 until user acceptance and release.
+This document describes v0.1.2. See [release verification](docs/release-verification-v0.1.2.md) for the tested scope and limitations.
 
 Zero-dependency Node HTTP server and native ES modules in public/. Chinese learning UI. Server listens only on 127.0.0.1:4318 (PORT override). AI provider is selected by AI_PROVIDER=auto|ollama|openai-compatible|codex or the saved runtime selection. Auto prefers an available Ollama service, then a configured compatible API, otherwise reports Ollama unavailable. Codex requires explicit selection. OLLAMA_MODEL and OPENAI_MODEL configure each provider independently; AI_MODEL remains a legacy fallback. Saved web settings supply the compatible endpoint/model/key and persist the selected provider. Without saved web settings, provider switching applies only to the current server process and startup follows the environment configuration.
 

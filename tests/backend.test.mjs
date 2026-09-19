@@ -232,18 +232,28 @@ test('启动时选择在线模式不会恢复本地进程或覆盖用户选择',
   assert.equal(process.env.OLLAMA_MODEL, 'unchanged-model');
 });
 
-test('本地和auto启动均恢复已装引擎并采用专用端口，不强改选择', async t => {
+test('本地和auto启动均恢复已装引擎并采用专用端口，不强改选择', { timeout: 5000 }, async t => {
   isolateLocalEnvironment(t);
   for (const selection of ['ollama', 'auto']) {
+    process.env.OLLAMA_HOST = 'http://127.0.0.1:12345';
+    process.env.OLLAMA_MODEL = `unrestored-${selection}`;
     setProviderOverride(selection);
     let restores = 0, ready = false;
+    let configurationRead;
+    const configurationReadPromise = new Promise(resolve => { configurationRead = resolve; });
     const localAI = {
       restore: async () => { restores += 1; ready = true; },
-      getProviderConfig: () => ready ? { url: 'http://127.0.0.1:11435', model: 'installed-model' } : null,
+      getProviderConfig: () => {
+        if (!ready) return null;
+        configurationRead();
+        return { url: 'http://127.0.0.1:11435', model: 'installed-model' };
+      },
       getStatus: async () => ({ busy: false, phase: ready ? 'ready' : 'idle' }),
       close: async () => {}
     };
     const base = await withServer(t, { localAI, status: async () => ({ selected: getProviderOverride(), host: process.env.OLLAMA_HOST, model: process.env.OLLAMA_MODEL }) });
+    // 恢复在后台执行；等待配置读取事件后再断言。Promise 继续前，同步配置写入已完成。
+    await configurationReadPromise;
     const status = await fetch(base + '/api/status').then(r => r.json());
     assert.equal(restores, 1);
     assert.equal(status.selected, selection);

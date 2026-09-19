@@ -8,7 +8,12 @@
 
 `http://127.0.0.1:4318/?setup=1`
 
-本地 AI 模型不随安装器捆绑。这样下载包保持可控，安装器也不会偷偷消耗用户流量。安装器提供 `Setup AI.cmd`，在已安装 Ollama 后可一键下载默认的 `qwen2.5:7b` 模型；首次下载大约需要 3.5–6.5 GB，建议预留至少 12 GB 磁盘空间。也可以直接在首次设置页选择兼容的在线 API，但项目不会承诺第三方服务永久免费或可用。
+首次设置页提供两种方式，安装包不包含模型、API 密钥或账号额度：
+
+- 本地 AI：点击「一键准备本地 AI」，程序自动下载并校验独立的 Ollama 引擎、准备模型。无需先安装系统 Ollama 或执行命令。首次需联网，下载大小与磁盘要求以页面显示为准；准备完成后可离线使用，速度和效果取决于电脑与模型。
+- 在线 AI：点击「设置在线 AI」，选择服务商，按页面链接获取自己的 API 密钥，粘贴后点击「连接并使用」。部分服务提供有限免费额度，具体规则以服务商为准；软件不提供共享密钥或无限免费服务。无需下载模型或编辑 `.env`。
+
+以后双击 `Setup AI.cmd` 可再次打开同一设置页。这个入口本身不下载模型，也不要求用户另行安装 Ollama。
 
 ## 构建
 
@@ -16,18 +21,18 @@
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/installer/build-windows-installer.ps1 `
-  -SourceRef main -ReleaseVersion v0.1.1
+  -SourceRef main -ReleaseVersion v0.1.2
 ```
 
-`-SourceRef` 可以是分支、标签或完整提交。脚本会固定源码提交并核对便携包清单；如果系统没有 `ISCC.exe`，会把官方 Inno Setup 编译器下载到仓库外的 `.tools\inno`，不会修改系统安装。
+`v0.1.2` 当前为候选版本，构建不代表已发布。`-SourceRef` 可以是分支、标签或完整提交。实际源码以发行清单中的 `SourceCommit` 为准，不要求预先创建同名标签。脚本会核对便携包来源；如果系统没有 `ISCC.exe`，会把官方 Inno Setup 编译器准备在仓库内被 Git 忽略的 `.tools\inno` 工具目录。
 
 ## 隔离测试
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/installer/test-windows-installer.ps1 `
-  -InstallerPath release-artifacts\installer-output\ielts-writing-studio-v0.1.1-windows-x64-setup.exe
+  -InstallerPath release-artifacts\installer-output\ielts-writing-studio-v0.1.2-windows-x64-setup.exe
 ```
 
-测试会在临时目录安装、启动本地服务、检查内置 Node 和页面，然后关闭测试进程并删除临时目录，不会结束其他 Node 进程。
+测试使用 `/TESTINSTALL=1`，只在临时目录解包，不注册卸载项、不创建快捷方式、不自动打开浏览器，也不关闭其他应用。测试服务使用独立的本地 AI 和云配置目录，检查内置 Node、应用版本、设置模块及页面，然后关闭本次测试进程并清理目录。此模式须搭配新版安装器，旧安装器不支持该隔离参数。
 
-卸载只移除应用安装目录。Ollama 模型保存在用户目录，浏览器记录保存在浏览器中，二者都会保留。
+正式卸载只移除应用安装目录。本地 AI 保存在 `%LOCALAPPDATA%\JujinWritingStudio\local-ai`，在线设置保存在 `%LOCALAPPDATA%\JujinWritingStudio\settings`，练习记录保存在当前浏览器中。卸载会保留这些数据；不想保留在线密钥时，可先在「管理在线 AI」中删除已保存的连接。

@@ -1,32 +1,26 @@
-﻿param(
-    [string]$Model = 'qwen2.5:7b'
-)
+﻿$ErrorActionPreference = 'Stop'
 
-$ErrorActionPreference = 'Stop'
+function Resolve-StudioLauncher {
+    param([string]$ScriptDirectory)
 
-# 这个脚本只负责安装后的一键模型准备，不会删除或结束用户已有的 Ollama 进程。
-$ollamaCommand = Get-Command ollama.exe -ErrorAction SilentlyContinue
-if (-not $ollamaCommand) {
-    Write-Host '未检测到 Ollama。请先从 https://ollama.com/download/windows 安装 Ollama，然后重新运行本脚本。'
-    Start-Process 'https://ollama.com/download/windows'
-    exit 2
-}
-
-$ollamaUrl = 'http://127.0.0.1:11434'
-$ollamaProcess = $null
-try { Invoke-RestMethod -Uri "$ollamaUrl/api/tags" -TimeoutSec 3 | Out-Null } catch {
-    # Ollama 通常会随 Windows 登录自动运行；若尚未启动，只启动自己的服务实例。
-    $ollamaProcess = Start-Process -FilePath $ollamaCommand.Source -ArgumentList 'serve' -WindowStyle Hidden -PassThru
-    $ready = $false
-    for ($attempt = 0; $attempt -lt 30; $attempt++) {
-        Start-Sleep -Seconds 1
-        try { Invoke-RestMethod -Uri "$ollamaUrl/api/tags" -TimeoutSec 3 | Out-Null; $ready = $true; break } catch {}
-        if ($ollamaProcess.HasExited) { break }
+    # 安装包把本脚本放在应用根目录；源码仓库中则位于 scripts\installer。
+    foreach ($candidate in @(
+        (Join-Path $ScriptDirectory 'start.ps1'),
+        (Join-Path $ScriptDirectory '..\..\start.ps1')
+    )) {
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+            return (Resolve-Path -LiteralPath $candidate).Path
+        }
     }
-    if (-not $ready) { throw 'Ollama 服务没有在预期时间内启动。请打开 Ollama 后重试。' }
+    throw '找不到应用启动文件，请重新安装句进，或解压完整的下载包后重试。'
 }
 
-Write-Host "正在下载本地模型 $Model。首次下载约需 3.5–6.5 GB，请保持网络连接并预留至少 12 GB 磁盘空间。"
-& $ollamaCommand.Source pull $Model
-if ($LASTEXITCODE -ne 0) { throw "模型 $Model 下载失败，请检查网络后重试。" }
-Write-Host "本地模型 $Model 已准备好。现在打开句进并选择“本地 AI”。"
+$launcher = Resolve-StudioLauncher -ScriptDirectory $PSScriptRoot
+$savedStudioRoot = [Environment]::GetEnvironmentVariable('IELTS_STUDIO_ROOT', 'Process')
+try {
+    # 统一打开应用内的本地/在线 AI 选择页，下载只在用户点击页面按钮后开始。
+    $env:IELTS_STUDIO_ROOT = Split-Path -Parent $launcher
+    & $launcher -SetupAI
+} finally {
+    [Environment]::SetEnvironmentVariable('IELTS_STUDIO_ROOT', $savedStudioRoot, 'Process')
+}

@@ -8,7 +8,7 @@ import { countWords } from '../public/utils.js';
 // 在简化的 DOM/网络边界中执行正式状态转换。
 // 这里直接读取 app.js，避免重复实现持久化逻辑。
 const appSource = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
-const testedFunctions = ['saveDraft', 'saveHistory', 'analyze', 'freshExercise', 'clearResult', 'updateProviderControls', 'checkConnection', 'switchProvider'];
+const testedFunctions = ['saveDraft', 'saveHistory', 'analyze', 'freshExercise', 'clearResult', 'updateProviderControls', 'checkConnection', 'switchProvider', 'selectProvider'];
 const functionsSource = testedFunctions.map(name => {
   const match = appSource.match(new RegExp(`^(?:async )?function ${name}\\([^\\n]*\\) \\{[\\s\\S]*?^\\}`, 'm'));
   assert.ok(match, `Could not find the actual ${name} function in app.js`);
@@ -35,6 +35,9 @@ function harness(overrides = {}) {
     saveTimer: undefined,
     progressTimer: undefined,
     providerSwitching: false,
+    localAiBusy: false,
+    cloudAiBusy: false,
+    cloudAiSetup: { updateControls() {} },
     providerInfo: { provider: 'ollama', selected: 'auto' },
     connection: { available: false, checked: false },
     connectionRequest: 0,
@@ -219,6 +222,64 @@ test('changing provider blocks analysis and preserves the completed draft', asyn
   assert.equal(h.context.$('#provider-select').value, 'openai-compatible');
   assert.equal(h.context.connection.available, true);
   assert.equal(h.context.state.analysis, previousAnalysis);
+});
+
+test('cloud connection verification blocks analysis and provider changes without changing the draft', async () => {
+  const h = harness();
+  const previousState = structuredClone(h.context.state);
+  let requests = 0;
+  h.context.fetch = async () => { requests += 1; throw new Error('No request expected while setup is busy'); };
+  h.context.cloudAiBusy = true;
+  h.run('updateProviderControls()');
+  assert.equal(h.context.$('#provider-select').disabled, true);
+  await h.run('analyze()');
+  await h.run('switchProvider("ollama")');
+  assert.equal(requests, 0);
+  assert.deepEqual(h.context.state, previousState);
+  h.context.cloudAiBusy = false;
+  h.run('updateProviderControls()');
+  assert.equal(h.context.$('#provider-select').disabled, false);
+});
+
+test('local AI preparation blocks analysis and preserves the completed draft', async () => {
+  const h = harness();
+  const previousState = structuredClone(h.context.state);
+  let requests = 0;
+  h.context.fetch = async () => { requests += 1; throw new Error('No request expected while setup is busy'); };
+  h.context.localAiBusy = true;
+  await h.run('analyze()');
+  assert.equal(requests, 0);
+  assert.deepEqual(h.context.state, previousState);
+});
+
+test('environment-configured online AI can be selected without opening first-time setup', async () => {
+  const h = harness();
+  const previousState = structuredClone(h.context.state);
+  let opened = 0;
+  h.context.cloudAiSetup = { updateControls() {}, refresh: async () => ({ configured: false, environmentConfigured: true }), open: async () => { opened += 1; } };
+  const change = h.run('selectProvider("openai-compatible")');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.pending().url, '/api/provider');
+  h.pending().resolve({ ok: true, json: async () => ({ provider: 'compatible', selected: 'openai-compatible', available: true }) });
+  await change;
+  assert.equal(opened, 0);
+  assert.equal(h.context.$('#provider-select').value, 'openai-compatible');
+  assert.deepEqual(h.context.state, previousState);
+});
+
+test('unconfigured online AI opens setup and retains the previous provider and draft', async () => {
+  const h = harness();
+  const previousState = structuredClone(h.context.state);
+  let opened = 0;
+  let requests = 0;
+  h.context.fetch = async () => { requests += 1; throw new Error('Provider must not change before configuration'); };
+  h.context.cloudAiSetup = { updateControls() {}, refresh: async () => ({ configured: false, environmentConfigured: false }), open: async () => { opened += 1; } };
+  h.context.$('#provider-select').value = 'openai-compatible';
+  await h.run('selectProvider("openai-compatible")');
+  assert.equal(opened, 1);
+  assert.equal(requests, 0);
+  assert.equal(h.context.$('#provider-select').value, 'auto');
+  assert.deepEqual(h.context.state, previousState);
 });
 
 test('an old connection response cannot overwrite a later provider change', async () => {

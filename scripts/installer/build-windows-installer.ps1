@@ -1,7 +1,7 @@
 ﻿param(
     [string]$SourceRef = 'main',
     [ValidatePattern('^v\d+\.\d+\.\d+$')]
-    [string]$ReleaseVersion = 'v0.1.1',
+    [string]$ReleaseVersion = 'v0.1.2',
     [ValidatePattern('^v24\.\d+\.\d+$')]
     [string]$NodeVersion = 'v24.19.0',
     [string]$OutputDir,
@@ -51,7 +51,7 @@ foreach ($optionalRuntimePath in @('node_modules', 'npm', 'npx', 'corepack', 'co
     if (Test-Path -LiteralPath $optionalRuntime) { Remove-Item -LiteralPath $optionalRuntime -Recurse -Force }
 }
 
-# 安装后可选的一键模型准备工具，模型仍需用户主动下载，不把数 GB 模型放进安装器。
+# 安装后的 AI 设置入口统一打开应用内选择页，不把模型放进安装器。
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'setup-ai.ps1') -Destination (Join-Path $sourceRoot 'setup-ai.ps1')
 $setupCmd = @('@echo off', 'setlocal', 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0setup-ai.ps1" %*', 'if errorlevel 1 pause', 'endlocal') -join "`r`n"
 [IO.File]::WriteAllText((Join-Path $sourceRoot 'Setup AI.cmd'), $setupCmd, [Text.Encoding]::ASCII)
@@ -61,7 +61,7 @@ $sourceManifest.Runtime.CompleteOfficialDistribution = $false
 $sourceManifest.Runtime | Add-Member -NotePropertyName OmittedFiles -NotePropertyValue @('node_modules/', 'npm', 'npx', 'corepack', 'corepack.cmd', 'install_tools.bat', 'nodevars.bat')
 $sourceManifest.Runtime.FileCount = @(Get-ChildItem -LiteralPath $installerNodeRoot -Recurse -File).Count
 
-# 优先使用 PATH 中的 ISCC；没有时把官方安装程序放在仓库外的隔离工具目录。
+# 优先使用 PATH 中的 ISCC；没有时使用仓库内被 Git 忽略的独立工具目录。
 $iscc = Get-Command ISCC.exe -ErrorAction SilentlyContinue
 if ($iscc) { $isccPath = $iscc.Source } else {
     $toolRoot = Join-Path $projectRoot '.tools\inno'
@@ -110,8 +110,8 @@ $manifest = [ordered]@{
     };
     Runtime = $sourceManifest.Runtime
     ContainsAIModel = $false
-    FirstRun = '安装完成后打开 http://127.0.0.1:4318/?setup=1；本地模型可选择性下载。'
-    StorageNotice = '首次模型下载约 3.5–6.5 GB，建议预留至少 12 GB 磁盘空间；卸载不删除 Ollama 模型和浏览器记录。'
+    FirstRun = '安装完成后打开 http://127.0.0.1:4318/?setup=1；可一键准备本地 AI，或填写自己的密钥连接在线 AI。'
+    StorageNotice = '本地模型的下载量和磁盘要求以设置页显示为准；卸载保留本地模型、在线 AI 设置和浏览器记录。'
 }
 $manifestPath = Join-Path $artifactRoot "$packageName-setup.manifest.json"
 [IO.File]::WriteAllText($manifestPath, ($manifest | ConvertTo-Json -Depth 12), (New-Object Text.UTF8Encoding($false)))

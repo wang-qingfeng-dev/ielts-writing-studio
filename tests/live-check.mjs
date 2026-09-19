@@ -28,6 +28,9 @@ try {
   response = await requestJson(`${base}/api/analyze`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base }, body: JSON.stringify(input), timeoutMs:10 * 60 * 1000 });
 } finally { clearInterval(progress); }
 const result = response.data;
+// 实测失败也保留本机报告，方便定位模型返回问题；此文件由 .gitignore 排除。
+const report = { testedAt: new Date().toISOString(), durationSeconds: Math.round((Date.now() - started) / 1000), input, result };
+await writeFile(fileURLToPath(new URL('./live-result.json', import.meta.url)), JSON.stringify(report, null, 2), 'utf8');
 assert.equal(response.status, 200, result.error || 'Analysis failed');
 validateAnalysis(result, input.essay);
 assert(result.issues.length >= 3, 'Known grammar issues should be detected');
@@ -36,6 +39,4 @@ assert(result.model.text.split(/\s+/).length >= 250, 'Model should meet Task 2 l
 assert(result.model.text.toLowerCase().includes('transport'), 'Model must answer the new prompt');
 assert(result.model.notes.length >= 3, 'Model needs useful annotations');
 assert(result.priorities.some(item => /语法|主谓|单复数|搭配|准确/.test(item.title + item.description)), 'Priorities should identify the language problem');
-const report = { testedAt: new Date().toISOString(), durationSeconds: Math.round((Date.now() - started) / 1000), input, result };
-await writeFile(fileURLToPath(new URL('./live-result.json', import.meta.url)), JSON.stringify(report, null, 2), 'utf8');
 console.log(JSON.stringify({ success: true, durationSeconds: report.durationSeconds, originalBand: result.originalScore, correctedBand: result.corrected.score, modelBand: result.model.score, issues: result.issues.length, expressions: result.expressions.length, modelWords: result.model.text.split(/\s+/).length }, null, 2));

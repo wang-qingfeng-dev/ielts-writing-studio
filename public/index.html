@@ -20,7 +20,7 @@
       </a>
       <nav class="header-actions" aria-label="工作台导航">
         <span class="connection" id="connection-status" role="status"><span class="status-dot"></span>正在连接 AI</span>
-        <label class="sr-only" for="provider-select">下一篇分析使用的 AI 服务</label><select class="provider-select" id="provider-select" title="选择下一篇分析使用的 AI 服务"><option value="auto">自动选择 AI</option><option value="ollama">Ollama 本地</option><option value="openai-compatible">兼容 API</option><option value="codex">Codex CLI</option></select>
+        <label class="sr-only" for="provider-select">下一篇分析使用的 AI 服务</label><select class="provider-select" id="provider-select" title="选择下一篇分析使用的 AI 服务"><option value="auto">自动选择 AI</option><option value="ollama">Ollama 本地</option><option value="openai-compatible">在线 AI</option><option value="codex">Codex CLI</option></select>
         <button class="btn btn-ghost" data-action="history"><span data-icon="history"></span>练习记录<span class="count-badge" id="history-count">0</span></button>
         <button class="btn btn-secondary" data-action="library"><span data-icon="bookmark"></span>我的复习库<span class="count-badge" id="library-count">0</span></button>
       </nav>
@@ -37,7 +37,12 @@
       <div class="prompt-footer"><div class="prompt-options"><span class="task-badge">Academic / General · Task 2</span><label class="target-control" for="target-band">目标分数<select id="target-band"><option value="6">Band 6.0</option><option value="6.5">Band 6.5</option><option value="7" selected>Band 7.0</option><option value="7.5">Band 7.5</option><option value="8">Band 8.0</option><option value="8.5">Band 8.5</option></select></label></div><span class="prompt-hint" id="prompt-guidance">建议 40 分钟 · 至少 250 词</span></div>
     </section>
     <div id="notice" class="notice-banner hidden" role="status"></div>
+    <div id="analysis-warning" class="notice-banner hidden" role="status"></div>
     <div id="error" class="error-banner hidden" role="alert"></div>
+    <section class="cloud-ai-card" aria-labelledby="cloud-ai-title">
+      <div><h2 id="cloud-ai-title">电脑配置不高？使用在线 AI</h2><p id="cloud-ai-summary">不用下载模型。选择服务商，粘贴一次自己的 API 密钥，即可联网批改。免费额度与收费以服务商当前规则为准。</p></div>
+      <button class="btn btn-secondary" id="cloud-ai-open" type="button">设置在线 AI <span aria-hidden="true">↗</span></button>
+    </section>
     <section class="local-ai-setup hidden" id="local-ai-setup" aria-labelledby="local-ai-setup-title">
       <div class="local-ai-setup-main">
         <div class="local-ai-setup-icon" aria-hidden="true"><span data-icon="spark"></span></div>
@@ -45,7 +50,7 @@
           <p class="eyebrow">第一次使用</p>
           <h2 id="local-ai-setup-title">一键准备本地 AI</h2>
           <p id="local-ai-setup-message">点击后会自动检查并准备本机 AI。首次需要联网下载几个 GB，完成后可以离线使用。</p>
-          <p class="local-ai-setup-note">模型效果取决于电脑配置，AI 评分仅供练习参考，不代表官方成绩。</p>
+          <p class="local-ai-setup-note">本地 AI 在内存较少、没有独立显卡的电脑上可能需要较长时间；不想下载模型可以选择上方的在线 AI。AI 评分仅供练习参考。</p>
         </div>
       </div>
       <div class="local-ai-setup-status" id="local-ai-setup-status" role="status" aria-live="polite">
@@ -88,8 +93,27 @@
       <div class="section-heading"><div><p class="eyebrow">MAKE IT YOURS</p><h2 id="review-heading">读懂了，还要用得出来。</h2><p class="section-description">把这次的错误和好表达，带到下一道题里。</p></div><div class="section-actions"><button class="btn btn-secondary btn-small" data-action="export" id="export-button" disabled><span data-icon="download"></span>导出学习笔记</button></div></div>
       <div class="review-grid"><section class="review-column"><div class="review-column-heading"><h3><span data-icon="target"></span>我的易错点</h3><span class="review-count" id="errors-total">00</span></div><div id="review-errors"></div></section><section class="review-column"><div class="review-column-heading"><h3><span data-icon="link"></span>实用搭配</h3><span class="review-count" id="phrases-total">00</span></div><div id="review-phrases"></div></section><section class="review-column"><div class="review-column-heading"><h3><span data-icon="lightbulb"></span>好句与论证</h3><span class="review-count" id="notes-total">00</span></div><div id="review-notes"></div></section></div>
     </section>
-    <footer class="page-footer"><span>句进 · 一句一句，向前一步。 · v0.1.1</span><button class="text-button" data-action="about">评分说明与使用方法 <span aria-hidden="true">↗</span></button></footer>
+    <footer class="page-footer"><span>句进 · 一句一句，向前一步。 · v0.1.2 本地测试版</span><button class="text-button" data-action="about">评分说明与使用方法 <span aria-hidden="true">↗</span></button></footer>
   </main>
+  <dialog class="cloud-ai-dialog" id="cloud-ai-dialog" aria-labelledby="cloud-dialog-title" aria-describedby="cloud-dialog-description">
+    <form id="cloud-ai-form">
+      <div class="modal-header"><h2 id="cloud-dialog-title">设置在线 AI</h2><button type="button" class="icon-btn" id="cloud-ai-close" aria-label="关闭在线 AI 设置">✕</button></div>
+      <div class="modal-body">
+        <p id="cloud-dialog-description">不需要安装大模型。首次在服务商网站创建一个 API 密钥，之后就能直接在这里批改。</p>
+        <fieldset id="cloud-ai-fields" class="cloud-ai-fields">
+          <label for="cloud-provider">1. 选择服务商</label><select id="cloud-provider" name="provider" required></select>
+          <p id="cloud-provider-pricing" class="cloud-ai-hint"></p>
+          <p><a id="cloud-provider-signup" href="#" target="_blank" rel="noopener noreferrer">打开服务商网站，获取 API 密钥 ↗</a></p>
+          <label for="cloud-api-key">2. 粘贴 API 密钥</label><input id="cloud-api-key" name="apiKey" type="password" autocomplete="off" spellcheck="false" autocapitalize="off" maxlength="4096" placeholder="粘贴服务商提供的 API Key" aria-describedby="cloud-key-help">
+          <p id="cloud-key-help" class="cloud-ai-hint">密钥保存在这台电脑的应用配置中，不写入作文记录或 GitHub。不要在共享电脑上保存自己的密钥。</p>
+          <details id="cloud-advanced"><summary>模型与接口地址</summary><div class="cloud-advanced-fields"><label for="cloud-model">模型名称</label><input id="cloud-model" name="model" type="text" maxlength="200" autocomplete="off" required><label for="cloud-base-url">API 地址</label><input id="cloud-base-url" name="baseUrl" type="url" maxlength="500" autocomplete="off" required aria-describedby="cloud-base-help"><p id="cloud-base-help" class="cloud-ai-hint">预设服务无需修改。自定义服务请填写兼容接口的基础地址，通常以 /v1 结尾。</p></div></details>
+          <label class="cloud-consent" for="cloud-consent"><input id="cloud-consent" type="checkbox" required><span>我同意分析时将题目和作文发送给所选服务商，并使用我的账户额度；测试连接也会发送一条简短测试请求。</span></label>
+        </fieldset>
+        <p id="cloud-ai-feedback" class="cloud-ai-feedback hidden" role="status" aria-live="polite"></p>
+      </div>
+      <div class="modal-footer cloud-ai-footer"><button type="button" class="text-button cloud-clear hidden" id="cloud-ai-clear">删除已保存的连接</button><button type="button" class="btn btn-secondary" id="cloud-ai-cancel">取消</button><button type="submit" class="btn btn-primary" id="cloud-ai-save">连接并使用</button></div>
+    </form>
+  </dialog>
   <div id="modal-root"></div><div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 </body>
 </html>

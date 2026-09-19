@@ -126,6 +126,35 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .header-actions { gap: 9px; }
 .provider-select { max-width: 134px; min-height: 37px; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--green); background: var(--surface, white); font: inherit; font-size: 12px; }
 .provider-select:disabled { opacity: .55; cursor: wait; }
+/* 在线设置独立于作文数据，窄屏也保留完整操作入口。 */
+.cloud-ai-card { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 17px; padding: 17px 21px; background: var(--green-soft); border: 1px solid var(--line); border-radius: 12px; }
+.cloud-ai-card h2 { margin-bottom: 4px; color: var(--ink); font-size: 14px; }
+.cloud-ai-card p { max-width: 860px; font-size: 12px; color: var(--muted); }
+.cloud-ai-card .btn { flex-shrink: 0; }
+.cloud-ai-dialog { width: min(600px, calc(100vw - 28px)); max-height: calc(100dvh - 36px); margin: auto; padding: 0; overflow-y: auto; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--text); box-shadow: 0 24px 90px rgb(25 43 30 / 20%); }
+.cloud-ai-dialog::backdrop { background: rgb(27 40 31 / 42%); }
+body:has(.cloud-ai-dialog[open]) { overflow: hidden; }
+.cloud-ai-dialog .modal-body > p { font-size: 13px; }
+.cloud-ai-fields { display: grid; min-width: 0; gap: 10px; padding: 0; margin: 19px 0 0; border: 0; }
+.cloud-ai-fields > label:not(.cloud-consent) { margin-top: 7px; font-size: 13px; font-weight: 600; color: var(--ink); }
+.cloud-ai-fields input:not([type="checkbox"]), .cloud-ai-fields select { min-width: 0; width: 100%; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); }
+.cloud-ai-fields input[readonly] { background: var(--paper); color: var(--muted); }
+.cloud-ai-fields a { font-size: 12px; }
+.cloud-ai-hint { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.cloud-ai-fields details { padding: 12px 0; border-top: 1px solid var(--line); }
+.cloud-ai-fields summary { cursor: pointer; color: var(--green); font-size: 12px; }
+.cloud-advanced-fields { display: grid; gap: 8px; padding-top: 12px; font-size: 12px; }
+.cloud-consent { display: flex; align-items: flex-start; gap: 9px; padding: 12px; background: var(--green-soft); border-radius: 8px; font-size: 12px; }
+.cloud-consent input { flex-shrink: 0; margin-top: 4px; accent-color: var(--green); }
+.cloud-ai-feedback { padding: 12px; margin-top: 14px; border-radius: 8px; background: var(--green-soft); color: var(--green); }
+.cloud-ai-feedback.is-error { background: var(--red-soft); color: var(--red); }
+.cloud-ai-footer { flex-wrap: wrap; gap: 10px; }
+.cloud-ai-footer .cloud-clear { margin-right: auto; color: var(--red); }
+@media (max-width: 640px) {
+  .cloud-ai-card { align-items: flex-start; flex-direction: column; gap: 12px; padding: 16px; }
+  .cloud-ai-card .btn { width: 100%; }
+  .cloud-ai-footer .cloud-clear { flex: 1 0 100%; }
+}
 .connection {
   display: inline-flex;
   align-items: center;

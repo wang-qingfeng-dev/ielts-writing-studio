@@ -6,6 +6,8 @@ import path from 'node:path';
 import http from 'node:http';
 import { createServer, buildCorrectionPrompt, buildModelPrompt } from '../server.mjs';
 import { validateRequest, validateAnalysis, validateCorrection, validateModel } from '../analysis-schema.mjs';
+import { createCloudSettingsStore } from '../cloud-settings.mjs';
+import { getProviderOverride, setProviderOverride, setCloudConfig } from '../provider.mjs';
 
 const input = { prompt: 'Should cities provide free buses to all residents?', essay: 'There are several reason to improve buses. It make travel easier for residents.', targetBand: 7 };
 const score = () => ({ low: 5.5, high: 6.5, criteria: ['TR', 'CC', 'LR', 'GRA'].map(key => ({ key, band: 6, evidence: '论点明确但展开不足。', action: '补充一个具体例子。' })) });
@@ -22,9 +24,24 @@ let folder;
 before(async () => { folder = await mkdtemp(path.join(os.tmpdir(), 'ielts-tests-')); await mkdir(path.join(folder, 'public')); await writeFile(path.join(folder, 'public', 'index.html'), '<!doctype html><p>IELTS</p>'); await writeFile(path.join(folder, 'secret.txt'), 'private'); });
 after(async () => { await rm(folder, { recursive: true, force: true }); });
 async function withServer(t, options = {}) {
-  const server = createServer({ publicDir: path.join(folder, 'public'), analyze: async () => fixture(), status: async () => ({ available: true, engine: 'test', message: 'ready' }), ...options });
+  const settingsRoot = await mkdtemp(path.join(folder, 'settings-'));
+  const cloudStore = createCloudSettingsStore({ rootDir: settingsRoot });
+  const localAI = {
+    getStatus: async () => ({ supported: true, busy: false, phase: 'idle' }),
+    restore: async () => ({ busy: false, phase: 'idle' }),
+    getProviderConfig: () => null,
+    start: () => ({ busy: true, phase: 'checking' }),
+    cancel: () => ({ busy: false, phase: 'cancelled' }),
+    close: async () => {}
+  };
+  // 后端接口测试不能读取用户的真实云密钥或唤醒真实本地模型。
+  const server = createServer({ publicDir: path.join(folder, 'public'), cloudStore, localAI, analyze: async () => fixture(), status: async () => ({ available: true, engine: 'test', message: 'ready' }), ...options });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  t.after(() => new Promise(resolve => { server.closeAllConnections(); server.close(resolve); }));
+  t.after(async () => {
+    await new Promise(resolve => { server.closeAllConnections(); server.close(resolve); });
+    setCloudConfig(null); setProviderOverride('auto');
+    await rm(settingsRoot, { recursive: true, force: true });
+  });
   return `http://127.0.0.1:${server.address().port}`;
 }
 function post(base, body = input, headers = {}) { return fetch(`${base}/api/analyze`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, ...headers }, body: JSON.stringify(body) }); }
@@ -182,4 +199,74 @@ test('local AI setup endpoints expose only the injected manager lifecycle', asyn
   assert.equal(cancel.status, 200);
   assert.deepEqual(calls, ['start', 'cancel']);
   assert.equal((await fetch(`${base}/api/local-ai/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '[]' })).status, 400);
+});
+
+function isolateLocalEnvironment(t) {
+  const old = { OLLAMA_HOST: process.env.OLLAMA_HOST, OLLAMA_MODEL: process.env.OLLAMA_MODEL };
+  t.after(() => {
+    for (const [key, value] of Object.entries(old)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  });
+}
+
+test('启动时选择在线模式不会恢复本地进程或覆盖用户选择', async t => {
+  isolateLocalEnvironment(t);
+  process.env.OLLAMA_HOST = 'http://127.0.0.1:12345';
+  process.env.OLLAMA_MODEL = 'unchanged-model';
+  const rootDir = await mkdtemp(path.join(folder, 'online-startup-'));
+  const cloudStore = createCloudSettingsStore({ rootDir });
+  await cloudStore.save({ provider: 'deepseek', apiKey: 'test-only-key' }, { tested: true });
+  let restores = 0;
+  const localAI = {
+    restore: async () => { restores += 1; },
+    getProviderConfig: () => ({ url: 'http://127.0.0.1:11435', model: 'local-model' }),
+    getStatus: async () => ({ busy: false, phase: 'idle' }),
+    close: async () => {}
+  };
+  const base = await withServer(t, { cloudStore, localAI, status: async () => ({ selected: getProviderOverride() }) });
+  const status = await fetch(base + '/api/status').then(r => r.json());
+  assert.equal(status.selected, 'openai-compatible');
+  assert.equal(restores, 0);
+  assert.equal(process.env.OLLAMA_HOST, 'http://127.0.0.1:12345');
+  assert.equal(process.env.OLLAMA_MODEL, 'unchanged-model');
+});
+
+test('本地和auto启动均恢复已装引擎并采用专用端口，不强改选择', async t => {
+  isolateLocalEnvironment(t);
+  for (const selection of ['ollama', 'auto']) {
+    setProviderOverride(selection);
+    let restores = 0, ready = false;
+    const localAI = {
+      restore: async () => { restores += 1; ready = true; },
+      getProviderConfig: () => ready ? { url: 'http://127.0.0.1:11435', model: 'installed-model' } : null,
+      getStatus: async () => ({ busy: false, phase: ready ? 'ready' : 'idle' }),
+      close: async () => {}
+    };
+    const base = await withServer(t, { localAI, status: async () => ({ selected: getProviderOverride(), host: process.env.OLLAMA_HOST, model: process.env.OLLAMA_MODEL }) });
+    const status = await fetch(base + '/api/status').then(r => r.json());
+    assert.equal(restores, 1);
+    assert.equal(status.selected, selection);
+    assert.equal(status.host, 'http://127.0.0.1:11435');
+    assert.equal(status.model, 'installed-model');
+  }
+});
+
+test('后台恢复期间网页仍可读取，恢复失败不会阻塞在线设置入口', async t => {
+  setProviderOverride('ollama');
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  t.after(() => release());
+  const localAI = {
+    restore: async () => { await gate; throw new Error('fake restoration failure'); },
+    getProviderConfig: () => null,
+    getStatus: async () => ({ busy: true, phase: 'starting' }),
+    close: async () => {}
+  };
+  const base = await withServer(t, { localAI });
+  const page = await fetch(base, { signal: AbortSignal.timeout(1000) });
+  assert.equal(page.status, 200);
+  assert.equal((await fetch(base + '/api/cloud-settings', { signal: AbortSignal.timeout(1000) })).status, 200);
+  release();
+  assert.equal((await fetch(base + '/api/status')).status, 200);
 });

@@ -52,6 +52,8 @@ function normalizeStatus(payload = {}) {
     downloadedBytes: Number(payload.downloadedBytes) || 0,
     totalBytes: Number(payload.totalBytes) || 0,
     model: typeof payload.model === 'string' ? payload.model : '',
+    recommendedModel: typeof payload.recommendedModel === 'string' ? payload.recommendedModel : '',
+    updateAvailable: Boolean(payload.updateAvailable),
     modelSizeGB: Number(payload.modelSizeGB) || 0,
     memoryGB: Number(payload.memoryGB) || 0,
     requiredDiskGB: Number(payload.requiredDiskGB) || 0,
@@ -96,7 +98,7 @@ export function initLocalAiSetup(options = {}) {
   let fetching = false;
   let preparing = false;
   let cancelRequested = false;
-  let autoStarted = false;
+  let setupChoicesShown = false;
 
   function emit() { options.onStateChange?.({...current}); }
   function updateButtons() {
@@ -106,7 +108,8 @@ export function initLocalAiSetup(options = {}) {
     retryButton.disabled = appBusy || localBusy;
     readyButton.disabled = appBusy;
     cancelButton.disabled = appBusy || cancelRequested;
-    startButton.classList.toggle('hidden', localBusy || current.phase === 'ready');
+    startButton.classList.toggle('hidden', localBusy || (current.phase === 'ready' && !current.updateAvailable));
+    startButton.textContent = current.updateAvailable ? '更新推荐本地模型' : '一键准备本地 AI';
     retryButton.classList.toggle('hidden', localBusy || !['error', 'cancelled'].includes(current.phase));
     cancelButton.classList.toggle('hidden', !localBusy);
     readyButton.classList.toggle('hidden', current.phase !== 'ready');
@@ -129,10 +132,10 @@ export function initLocalAiSetup(options = {}) {
     const modelSize = formatSizeGB(current.modelSizeGB);
     const memory = formatSizeGB(current.memoryGB);
     const disk = formatSizeGB(current.requiredDiskGB);
-    const requirements = [modelSize && `模型约 ${modelSize}`, memory && `建议内存 ${memory}`, disk && `需要磁盘 ${disk}`].filter(Boolean);
+    const requirements = [modelSize && `模型约 ${modelSize}`, memory && `本机内存 ${memory}`, disk && `需要磁盘 ${disk}`].filter(Boolean);
     modelNode.textContent = [current.model && `模型：${current.model}`, ...requirements].join(' · ');
     const defaultMessage = current.phase === 'unsupported'
-      ? '当前系统暂不支持自动准备本地 AI。你仍可使用高级设置中的兼容 API。'
+      ? '当前系统暂不支持自动准备本地 AI。你仍可点击上方「设置在线 AI」，连接自己的在线服务。'
       : current.phase === 'ready'
         ? '准备完成。之后可以离线使用本地 AI；模型效果取决于你的电脑配置。'
         : '点击后会自动检查并准备本机 AI。首次需要联网下载几个 GB，完成后可以离线使用。';
@@ -179,8 +182,8 @@ export function initLocalAiSetup(options = {}) {
       startPolling();
     } catch (error) {
       const payload = error.payload || {};
-      render({...current, phase:'error', busy:false, error: error.status === 409 ? '正在进行其他 AI 操作，请稍候再试。' : (payload.error || error.message), message:'本地 AI 准备没有启动。'});
       preparing = false; cancelRequested = false; stopPolling();
+      render({...current, phase:'error', busy:false, error: error.status === 409 ? '正在进行其他 AI 操作，请稍候再试。' : (payload.error || error.message), message:'本地 AI 准备没有启动。'});
     }
   }
   async function cancel() {
@@ -209,11 +212,14 @@ export function initLocalAiSetup(options = {}) {
     const status = await readStatus();
     if (status.busy) { preparing = true; startPolling(); }
     // 已经准备过的用户再次打开应用时，也恢复本地 Ollama 选择；这不会触发下载。
-    if (status.phase === 'ready') options.onReady?.();
+    if (status.phase === 'ready') options.onReady?.({ automatic: true });
     const setupRequested = new URLSearchParams(location.search).get('setup') === '1';
-    if (setupRequested && !autoStarted && status.supported && ['idle', 'cancelled', 'error'].includes(status.phase)) {
-      autoStarted = true;
-      await start();
+    // 安装后的首次启动只展示选择。下载模型必须由用户主动点击，在线入口保持可用。
+    if (setupRequested && !setupChoicesShown && !status.busy) {
+      setupChoicesShown = true;
+      const choiceButton = byId('cloud-ai-open');
+      choiceButton?.focus({ preventScroll: true });
+      choiceButton?.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
     return current;
   };

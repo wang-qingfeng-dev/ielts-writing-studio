@@ -1,22 +1,24 @@
 const object = properties => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
 const string = { type: 'string' };
+// 字段级语言说明有助于小模型在英文作文与中文讲解之间保持边界。
+const chinese = { type: 'string', description: '必须用简体中文解释，可以引用英文原句。Write in Simplified Chinese, not English.' };
 const array = items => ({ type: 'array', items });
 const enumeration = values => ({ type: 'string', enum: values });
 
 export const scoreSchema = object({
   low: { type: 'number' }, high: { type: 'number' },
-  criteria: array(object({ key: enumeration(['TR', 'CC', 'LR', 'GRA']), band: { type: 'number' }, evidence: string, action: string }))
+  criteria: array(object({ key: enumeration(['TR', 'CC', 'LR', 'GRA']), band: { type: 'number' }, evidence: chinese, action: chinese }))
 });
-const expressionSchema = object({ id: string, text: string, meaning: string, example: string, source: enumeration(['corrected', 'model']), usage: string });
+const expressionSchema = object({ id: string, text: string, meaning: chinese, example: string, source: enumeration(['corrected', 'model']), usage: chinese });
 export const correctionSchema = object({
   originalScore: scoreSchema,
   corrected: object({ text: string, score: scoreSchema }),
-  issues: array(object({ id: string, category: enumeration(['grammar', 'vocabulary', 'logic', 'spelling']), original: string, replacement: string, explanation: string, priority: enumeration(['essential', 'optional']), practice: object({ question: string, answer: string }) })),
+  issues: array(object({ id: string, category: enumeration(['grammar', 'vocabulary', 'logic', 'spelling']), original: string, replacement: string, explanation: chinese, priority: enumeration(['essential', 'optional']), practice: object({ question: string, answer: string }) })),
   expressions: array(expressionSchema),
-  priorities: array(object({ title: string, description: string }))
+  priorities: array(object({ title: chinese, description: chinese }))
 });
 export const modelSchema = object({
-  model: object({ text: string, score: scoreSchema, notes: array(object({ quote: string, label: string, explanation: string })) }),
+  model: object({ text: string, score: scoreSchema, notes: array(object({ quote: string, label: chinese, explanation: chinese })) }),
   expressions: array(expressionSchema)
 });
 

@@ -14,10 +14,11 @@ const OLLAMA_SHA256 = '8f3fd071a2a2f9497b562f43502c77c2b701a99d1ee5dfda28da8c786
 const OLLAMA_PORT = 11435;
 const OLLAMA_HOST = `127.0.0.1:${OLLAMA_PORT}`;
 const MODELS = Object.freeze({
+  'qwen3.5:4b': Object.freeze({ modelSizeGB: 3.4, requiredDiskGB: 12, requiredMemoryGB: 12 }),
   'qwen2.5:7b': Object.freeze({ modelSizeGB: 4.7, requiredDiskGB: 8, requiredMemoryGB: 14 }),
   'qwen2.5:3b': Object.freeze({ modelSizeGB: 2.0, requiredDiskGB: 5, requiredMemoryGB: 8 })
 });
-const DEFAULT_MODEL = 'qwen2.5:7b';
+const DEFAULT_MODEL = 'qwen3.5:4b';
 const DOWNLOAD_SIZE = 1460928014;
 const PHASES = new Set(['idle', 'checking', 'downloading', 'extracting', 'starting', 'pulling', 'verifying', 'ready', 'cancelled', 'error', 'unsupported']);
 
@@ -111,9 +112,9 @@ export function createLocalAIManager(options = {}) {
   const statePath = path.join(root, 'state.json');
   const expectedSha256 = String(options.expectedSha256 || OLLAMA_SHA256).toLowerCase();
   const memoryBytes = Number(options.memoryBytes || deps.totalMemory());
-  // 默认按内存自动选择：14 GiB 以上使用 7B，否则 8 GiB 以上使用 3B。
-  const selectedModel = safeModel(options.model) || (memoryBytes >= 14 * 1024 ** 3 ? DEFAULT_MODEL : 'qwen2.5:3b');
-  const profile = MODELS[selectedModel];
+  // 默认只推荐已验证的 4B 模型；低内存用户使用在线服务，不悄悄降级为未验证的小模型。
+  let selectedModel = safeModel(options.model) || DEFAULT_MODEL;
+  let profile = MODELS[selectedModel];
   const requestTimeoutMs = Math.max(3000, Number(options.requestTimeoutMs || 15000));
   const downloadTimeoutMs = Math.max(10000, Number(options.downloadTimeoutMs || 30 * 60 * 1000));
   const status = {
@@ -121,7 +122,8 @@ export function createLocalAIManager(options = {}) {
     busy: false, phase: 'idle', message: '尚未安装本地 AI。', progress: null,
     downloadedBytes: 0, totalBytes: DOWNLOAD_SIZE, model: selectedModel,
     modelSizeGB: profile.modelSizeGB, memoryGB: Math.round((memoryBytes / 1024 ** 3) * 10) / 10,
-    requiredDiskGB: profile.requiredDiskGB
+    requiredDiskGB: profile.requiredDiskGB, requiredMemoryGB: profile.requiredMemoryGB,
+    recommendedModel: DEFAULT_MODEL, updateAvailable: false
   };
   let operation = null;
   let ownedProcess = null;
@@ -228,18 +230,34 @@ export function createLocalAIManager(options = {}) {
     await deps.execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', `Expand-Archive -LiteralPath ${q(archivePath)} -DestinationPath ${q(installDir)} -Force`], { windowsHide: true, timeout: downloadTimeoutMs, signal });
   }
   function spawnServer() {
-    if (ownedProcess && !ownedProcess.killed) return;
+    if (ownedProcess && !ownedProcess.killed && ownedProcess.exitCode == null) return;
     if (!executablePath) throw new Error('Ollama 可执行文件不存在。');
     const child = deps.spawn(executablePath, ['serve'], { cwd: installDir, env: { ...env, OLLAMA_HOST, OLLAMA_MODELS: modelsDir }, stdio: 'ignore', windowsHide: true, detached: false });
     ownedProcess = child;
-    child.once?.('error', error => { if (operation && !operation.signal.aborted) setStatus({ phase: 'error', busy: false, error: error.message, message: `Ollama 启动失败：${error.message}` }); });
-    child.once?.('exit', (code, signal) => { if (operation && !operation.signal.aborted && status.phase !== 'ready') setStatus({ phase: 'error', busy: false, error: `进程退出（${code ?? signal ?? 'unknown'}）。`, message: 'Ollama 进程意外退出。' }); });
+    child.once?.('error', () => {
+      if (ownedProcess !== child) return;
+      ownedProcess = null;
+      if (!disposed && operation && !operation.signal.aborted) setStatus({ phase: 'error', busy: false, error: 'Ollama 启动失败。', message: 'Ollama 启动失败，请重试。' });
+    });
+    child.once?.('exit', (code, signal) => {
+      if (ownedProcess !== child) return;
+      ownedProcess = null;
+      // 就绪后崩溃也必须撤销 ready，否则再次选择本地模式永远无法恢复进程。
+      if (!disposed && operation && !operation.signal.aborted) setStatus({ phase: 'error', busy: false, error: `进程退出（${code ?? signal ?? 'unknown'}）。`, message: 'Ollama 进程意外退出，请重试。' });
+    });
+  }
+  async function serverAvailable(signal) {
+    try {
+      const response = await request(`http://${OLLAMA_HOST}/api/tags`, {}, signal, 2500);
+      if (!response.ok) return false;
+      return Array.isArray((await response.json())?.models);
+    } catch { throwIfCancelled(signal); return false; }
   }
   async function waitForServer(signal) {
     const deadline = Date.now() + Number(options.startTimeoutMs || 45000);
     while (Date.now() < deadline) {
       throwIfCancelled(signal);
-      try { const response = await request(`http://${OLLAMA_HOST}/api/tags`, {}, signal, 2500); if (response.ok) return; } catch {}
+      if (await serverAvailable(signal)) return;
       await new Promise(resolve => setTimeout(resolve, 300));
     }
     throw new Error('Ollama 启动超时，请重试。');
@@ -268,24 +286,32 @@ export function createLocalAIManager(options = {}) {
     if (buffer.trim()) parsePullLine(buffer);
   }
   async function smokeTest(signal) {
-    const response = await request(`http://${OLLAMA_HOST}/api/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: selectedModel, stream: false, format: 'json', options: { temperature: 0 }, messages: [{ role: 'system', content: '只返回 JSON。' }, { role: 'user', content: '请返回 {"ok":true}。' }] }) }, signal, 60000);
+    const body = { model: selectedModel, stream: false, format: 'json', options: { temperature: 0, num_predict:128 }, messages: [{ role: 'system', content: '只返回 JSON。' }, { role: 'user', content: '请返回 {"ok":true}。' }] };
+    if (/^qwen3(?:[.:]|$)/i.test(selectedModel)) body.think = false;
+    const response = await request(`http://${OLLAMA_HOST}/api/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, signal, 60000);
     if (!response.ok) throw new Error(`本地 AI 检查失败（HTTP ${response.status}）。`);
     const data = await response.json();
     const content = data?.message?.content || data?.choices?.[0]?.message?.content;
     const parsed = parseJsonContent(content);
-    if (!parsed || typeof parsed !== 'object') throw new Error('本地 AI 检查没有返回 JSON 对象。');
+    if (parsed?.ok !== true) throw new Error('模型未通过连接检查，请重试。');
   }
   async function saveState() {
     await deps.fs.mkdir(root, { recursive: true });
-    await deps.fs.writeFile(statePath, JSON.stringify({ version: 1, model: selectedModel, executablePath, phase: status.phase, ready: status.phase === 'ready' }, null, 2), 'utf8');
+    // 先原子保存完整安装记录，再对外报告 ready；避免恢复时读到半写入文件。
+    const temporary = `${statePath}.${crypto.randomUUID()}.tmp`;
+    try {
+      await deps.fs.writeFile(temporary, JSON.stringify({ version: 1, model: selectedModel, executablePath, phase:'ready', ready:true }, null, 2), 'utf8');
+      await deps.fs.rename(temporary, statePath);
+    } finally { await deps.fs.rm(temporary, { force:true }).catch(() => {}); }
   }
   async function run(signal, restoreOnly = false) {
     try {
       if (!status.supported) { setStatus({ phase: 'unsupported', busy: false, message: '本地 AI 自动安装目前只支持 Windows 64 位。' }); return; }
-      if (memoryBytes < 8 * 1024 ** 3) { setStatus({ phase: 'unsupported', busy: false, message: '电脑内存少于 8 GiB，无法安全运行推荐模型。' }); return; }
+      if (memoryBytes < profile.requiredMemoryGB * 1024 ** 3) { setStatus({ phase: 'unsupported', busy: false, message: `运行 ${selectedModel} 至少需要 ${profile.requiredMemoryGB} GiB 内存，建议使用 16 GB 以上且有独立显卡的电脑。当前请使用在线 AI。` }); return; }
       setStatus({ phase: 'checking', busy: true, error: undefined, message: '正在检查电脑环境…', progress: null });
       await ensureDirs();
-      if (!(await diskCheck())) throw new Error(`可用磁盘空间不足，需要至少 ${profile.requiredDiskGB} GB。`);
+      // 日常恢复复用已下载文件，不应再次要求预留整套模型的安装空间。
+      if (!restoreOnly && !(await diskCheck())) throw new Error(`可用磁盘空间不足，需要至少 ${profile.requiredDiskGB} GB。`);
       executablePath = await locateExecutable(installDir);
       if (!executablePath) {
         if (restoreOnly) throw new Error('已保存的本地 AI 安装不完整，请重新安装。');
@@ -300,8 +326,12 @@ export function createLocalAIManager(options = {}) {
         if (!executablePath) throw new Error('Ollama 压缩包中没有找到可执行文件。');
       }
       setStatus({ phase: 'starting', message: '正在启动本地 AI…', progress: null });
-      spawnServer();
-      await waitForServer(signal);
+      // 旧窗口可能已启动专用端口的 Ollama。复用有效服务，不再创建端口冲突进程，
+      // 也不把其他窗口启动的进程当成自己拥有的进程，因此 close 不会终止它。
+      if (!(await serverAvailable(signal))) {
+        spawnServer();
+        await waitForServer(signal);
+      }
       if (!(await modelAvailable(signal))) {
         if (restoreOnly) throw new Error('本地 AI 模型尚未准备好，请点击安装完成首次下载。');
         setStatus({ phase: 'pulling', message: `正在准备 ${selectedModel} 模型…`, progress: 0, downloadedBytes: 0, totalBytes: null });
@@ -310,8 +340,9 @@ export function createLocalAIManager(options = {}) {
       setStatus({ phase: 'verifying', message: '正在进行本地 AI 检查…', progress: null });
       if (!(await modelAvailable(signal))) throw new Error('模型下载后仍不可用。');
       await smokeTest(signal);
-      setStatus({ phase: 'ready', busy: false, progress: 100, message: `本地 AI 已准备好（${selectedModel}）。`, error: undefined });
       await saveState();
+      throwIfCancelled(signal);
+      setStatus({ phase: 'ready', busy: false, progress: 100, message: `本地 AI 已准备好（${selectedModel}）。`, error: undefined, updateAvailable: selectedModel !== DEFAULT_MODEL });
     } catch (error) {
       if (signal?.aborted || error?.code === 'CANCELLED') setStatus({ phase: 'cancelled', busy: false, message: '本地 AI 安装已取消。', error: undefined });
       else setStatus({ phase: 'error', busy: false, message: asError(error).message, error: asError(error).message });
@@ -320,6 +351,10 @@ export function createLocalAIManager(options = {}) {
   function start() {
     if (disposed) return snapshot();
     if (status.busy) return snapshot();
+    // 只有用户主动点准备/更新时才下载推荐模型；自动 restore 继续使用原模型。
+    selectedModel = safeModel(options.model) || DEFAULT_MODEL;
+    profile = MODELS[selectedModel];
+    setStatus({ model: selectedModel, modelSizeGB: profile.modelSizeGB, requiredDiskGB: profile.requiredDiskGB, requiredMemoryGB: profile.requiredMemoryGB, updateAvailable: false });
     operation = { controller: new AbortController() };
     operation.signal = operation.controller.signal;
     void run(operation.signal, false);
@@ -334,11 +369,42 @@ export function createLocalAIManager(options = {}) {
     else if (status.phase !== 'ready') setStatus({ phase: 'cancelled', busy: false, message: '本地 AI 安装已取消。' });
     return snapshot();
   }
-  function restore() {
-    if (disposed || status.busy) return snapshot();
+  async function restore() {
+    if (disposed || status.busy || status.phase === 'ready' || !status.supported) return snapshot();
     operation = { controller: new AbortController() };
     operation.signal = operation.controller.signal;
-    void run(operation.signal, true);
+    const signal = operation.signal;
+    setStatus({ phase: 'checking', busy: true, error: undefined, message: '正在查找已准备的本地 AI…', progress: null });
+    try {
+      let saved;
+      try { saved = JSON.parse(await deps.fs.readFile(statePath, 'utf8')); }
+      catch (error) {
+        if (error.code === 'ENOENT') {
+          // 首次启动只展示选择，不创建下载目录、不联网、不启动其他程序。
+          setStatus({ phase: 'idle', busy: false, message: '尚未安装本地 AI。' });
+          return snapshot();
+        }
+        throw new Error('已保存的本地 AI 状态无法读取，请点击准备本地 AI 重新检查。');
+      }
+      throwIfCancelled(signal);
+      if (!saved || saved.version !== 1 || saved.ready !== true) {
+        setStatus({ phase: 'idle', busy: false, message: '本地 AI 尚未完成准备，请点击准备本地 AI 继续。' });
+        return snapshot();
+      }
+      const installedModel = safeModel(saved.model);
+      if (!installedModel) throw new Error('已保存的本地模型不受支持，请点击准备本地 AI 重新检查。');
+      // 只信任程序自己的固定安装目录，不执行状态文件里记录的任意路径。
+      executablePath = await locateExecutable(installDir);
+      if (!executablePath) throw new Error('已保存的本地 AI 安装不完整，请点击准备本地 AI 修复。');
+      throwIfCancelled(signal);
+      selectedModel = installedModel;
+      profile = MODELS[selectedModel];
+      setStatus({ model: selectedModel, modelSizeGB: profile.modelSizeGB, requiredDiskGB: profile.requiredDiskGB, requiredMemoryGB: profile.requiredMemoryGB, updateAvailable: selectedModel !== DEFAULT_MODEL });
+      await run(signal, true);
+    } catch (error) {
+      if (signal.aborted || error?.code === 'CANCELLED') setStatus({ phase: 'cancelled', busy: false, message: '本地 AI 恢复已取消。', error: undefined });
+      else setStatus({ phase: 'error', busy: false, message: asError(error).message, error: asError(error).message });
+    }
     return snapshot();
   }
   function getStatus() { return Promise.resolve(snapshot()); }

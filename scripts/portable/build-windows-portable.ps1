@@ -1,7 +1,7 @@
 ﻿param(
     [string]$SourceRef = 'main',
     [ValidatePattern('^v\d+\.\d+\.\d+$')]
-    [string]$ReleaseVersion = 'v0.1.1',
+    [string]$ReleaseVersion = 'v0.1.2',
     [ValidatePattern('^v24\.\d+\.\d+$')]
     [string]$NodeVersion = 'v24.19.0'
 )
@@ -10,10 +10,10 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-# 只从 Git 标签导出应用，不复制工作目录中的 .env、日志或私人测试结果。
+# 只从已解析的 Git 提交导出应用，不复制工作目录中的 .env、日志或私人测试结果。
 $projectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $sourceCommit = (& git -C $projectRoot rev-parse "$SourceRef^{commit}").Trim()
-if ($LASTEXITCODE -ne 0) { throw 'The source tag could not be resolved.' }
+if ($LASTEXITCODE -ne 0 -or -not $sourceCommit) { throw 'The source reference could not be resolved to a commit.' }
 $artifactRoot = Join-Path $projectRoot 'release-artifacts'
 New-Item -ItemType Directory -Path $artifactRoot -Force | Out-Null
 $buildRoot = Join-Path $artifactRoot ('portable-build-' + [guid]::NewGuid().ToString('N'))
@@ -21,14 +21,14 @@ $packageName = "ielts-writing-studio-$ReleaseVersion-windows-x64"
 $packageRoot = Join-Path $buildRoot $packageName
 New-Item -ItemType Directory -Path $packageRoot -Force | Out-Null
 $sourceZip = Join-Path $buildRoot 'application-source.zip'
-& git -C $projectRoot archive --format=zip "--output=$sourceZip" $SourceRef
+& git -C $projectRoot archive --format=zip "--output=$sourceZip" $sourceCommit
 if ($LASTEXITCODE -ne 0) { throw 'git archive failed.' }
 [IO.Compression.ZipFile]::ExtractToDirectory($sourceZip, $packageRoot)
 $sourceFiles = @(Get-ChildItem -LiteralPath $packageRoot -Recurse -File)
 foreach ($file in $sourceFiles) {
     $relative = $file.FullName.Substring($packageRoot.Length + 1).Replace('\', '/')
     if ($relative -match '(^|/)(\.git/|release-artifacts/|output/|tmp/|node_modules/)|(^|/)\.env($|\.(?!example$))|\.log$|\.lnk$|(^|/)live-result\.json$') {
-        throw "Excluded local artifact appeared in the source tag: $relative"
+        throw "Excluded local artifact appeared in the source commit: $relative"
     };
 }
 
@@ -54,7 +54,7 @@ foreach ($required in @('node.exe', 'LICENSE', 'README.md')) {
 }
 Copy-Item -LiteralPath $checksumsPath -Destination (Join-Path $runtimeRoot "SHASUMS256-$NodeVersion.txt")
 
-# 启动包装器与中文说明作为独立附加文件，不改动标签中的源码。
+# 启动包装器与中文说明作为独立附加文件，不改动来源提交中的源码。
 $utf8 = New-Object Text.UTF8Encoding($false)
 $wrapperSource = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'Start Portable.cmd'))
 $wrapper = $wrapperSource.Replace('@NODE_DIRECTORY@', $nodeDirectory)
@@ -62,7 +62,9 @@ $wrapper = $wrapper -replace '\r?\n', "`r`n"
 [IO.File]::WriteAllText((Join-Path $packageRoot 'Start Portable.cmd'), $wrapper, [Text.Encoding]::ASCII)
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README.portable.zh-CN.md') -Destination (Join-Path $packageRoot 'README.portable.zh-CN.md')
 $readmePath = Join-Path $packageRoot 'README.portable.zh-CN.md'
-$readme = [IO.File]::ReadAllText($readmePath).Replace('v0.1.0', $ReleaseVersion)
+$readmeTemplate = [IO.File]::ReadAllText($readmePath)
+if (-not $readmeTemplate.Contains('@RELEASE_VERSION@')) { throw 'Portable README is missing the release-version placeholder.' }
+$readme = $readmeTemplate.Replace('@RELEASE_VERSION@', $ReleaseVersion)
 [IO.File]::WriteAllText($readmePath, $readme, $utf8)
 
 # 清单记录来源与哈希；源码全量校验可对照 SourceCommit 重新运行 git archive。
@@ -80,6 +82,7 @@ $runtimeManifest = [ordered]@{
 $manifest = [ordered]@{
     FormatVersion = 1
     Application = 'IELTS Writing Studio'
+    ReleaseVersion = $ReleaseVersion
     SourceRef = $SourceRef
     SourceCommit = $sourceCommit
     SourceArchiveSHA256 = (Get-FileHash -LiteralPath $sourceZip -Algorithm SHA256).Hash.ToLowerInvariant()

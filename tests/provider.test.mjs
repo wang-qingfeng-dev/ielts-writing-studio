@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { completeJson, getProviderStatus, getProviderOverride, setProviderOverride, resolveProvider, ProviderError } from '../provider.mjs';
+import { completeJson, getProviderStatus, getProviderOverride, setProviderOverride, setCloudConfig, resolveProvider, ProviderError } from '../provider.mjs';
 import { analyzeWriting } from '../server.mjs';
 import { DEMO_PROMPT, DEMO_ESSAY, DEMO_ANALYSIS } from '../public/demo.js';
 
@@ -37,7 +37,7 @@ async function fakeOllama(t) {
     const body = JSON.parse(Buffer.concat(chunks).toString());
     state.requests.push(body);
     const isCorrection = Boolean(body.format.properties.corrected);
-    const data = isCorrection
+    const data = body.format.properties.paragraphs ? {paragraphs:DEMO_ANALYSIS.model.text.split('\n\n')} : body.format.properties.score ? {score:DEMO_ANALYSIS.model.score,notes:DEMO_ANALYSIS.model.notes,expressions:DEMO_ANALYSIS.expressions.filter(item=>item.source==='model')} : isCorrection
       ? { originalScore: DEMO_ANALYSIS.originalScore, corrected: DEMO_ANALYSIS.corrected, issues: DEMO_ANALYSIS.issues, priorities: DEMO_ANALYSIS.priorities, expressions: DEMO_ANALYSIS.expressions.filter(item => item.source === 'corrected') }
       : { model: DEMO_ANALYSIS.model, expressions: DEMO_ANALYSIS.expressions.filter(item => item.source === 'model') };
     res.end(JSON.stringify({ message: { content: JSON.stringify(data) } }));
@@ -118,9 +118,9 @@ test('real HTTP Ollama analysis completes both jobs and isolates the model essay
   assert.deepEqual(result.corrected, DEMO_ANALYSIS.corrected);
   assert.deepEqual(result.model, DEMO_ANALYSIS.model);
   assert.deepEqual(result.issues, DEMO_ANALYSIS.issues);
-  assert.equal(state.requests.length, 2, 'both jobs should pass their first validation');
+  assert.equal(state.requests.length, 3, 'correction, full essay, then frozen-essay review should each pass on first attempt');
   const correction = state.requests.find(body => body.format.properties.corrected);
-  const model = state.requests.find(body => body.format.properties.model);
+  const model = state.requests.find(body => body.format.properties.paragraphs);
   for (const request of state.requests) {
     assert.equal(request.model, 'qwen2.5:7b');
     assert.equal(request.stream, false);
@@ -146,7 +146,7 @@ test('auto does not silently use a Codex account when Ollama and compatible conf
   configure(t, { AI_PROVIDER: 'auto', OLLAMA_HOST: 'http://127.0.0.1:1', AI_MODEL: undefined, AI_BASE_URL: undefined });
   const provider = await resolveProvider();
   assert.equal(provider.kind, 'ollama');
-  assert.equal(provider.model, 'qwen2.5:7b');
+  assert.equal(provider.model, 'qwen3.5:4b');
   const status = await getProviderStatus();
   assert.equal(status.available, false);
   assert.equal(status.provider, 'ollama');
@@ -258,4 +258,139 @@ test('non-JSON authentication errors retain their status without exposing provid
     completeJson({kind:'compatible',url:base,model:'test'}, {system:'system',prompt:'prompt',schema:{type:'object'}}),
     error => error.status === 401 && /AI_API_KEY/.test(error.message) && !error.message.includes('private-provider-details')
   );
+});
+
+test('Ollama rejects length-truncated responses even when their partial content is valid JSON', async t => {
+  let content;
+  const requests = [];
+  const base = await serveJson(t, (_req, res, body) => {
+    requests.push(body);
+    res.end(JSON.stringify({ done: true, done_reason: 'length', message: { content } }));
+  });
+  for (content of ['{"partial":true}', '{"partial":']) {
+    await assert.rejects(
+      completeJson({ kind: 'ollama', url: base, model: 'qwen2.5:7b' }, { system: 'system', prompt: 'prompt', schema: { type: 'object' }, maxTokens: 3072 }),
+      error => error instanceof ProviderError && error.status === 502 && /长度上限/.test(error.message)
+    );
+  }
+  assert.equal(requests.length, 2, '截断响应应交给上层重试，提供商层不能将其作为成功返回');
+  for (const request of requests) {
+    assert.equal(request.options.num_predict, 3072);
+    assert.equal(request.options.num_ctx, 16384);
+  }
+});
+
+test('Qwen3 Ollama requests disable thinking without adding the option to other model families', async t => {
+  const requests = [];
+  const base = await serveJson(t, (_req, res, body) => {
+    requests.push(body);
+    res.end(JSON.stringify({ done_reason: 'stop', message: { content: '{"ok":true}' } }));
+  });
+  const schema = { type: 'object', properties: { ok: { type: 'boolean' } }, required: ['ok'] };
+  for (const model of ['qwen3:8b', 'Qwen3:4b', 'qwen3', 'qwen3.5:4b', 'qwen2.5:7b']) {
+    assert.deepEqual(await completeJson({ kind: 'ollama', url: base, model }, { system: 'system', prompt: 'prompt', schema }), { ok: true });
+  }
+  for (const request of requests.slice(0, 4)) assert.equal(request.think, false, request.model);
+  assert.equal(Object.hasOwn(requests.at(-1), 'think'), false);
+  for (const request of requests) {
+    assert.deepEqual(request.format, schema);
+    assert.ok(request.messages[0].content.includes(JSON.stringify(schema)));
+    assert.equal(request.options.num_predict, 6144);
+  }
+});
+
+test('compatible providers reject length truncation before attempting JSON parsing', async t => {
+  let content;
+  const requests = [];
+  const base = await serveJson(t, (_req, res, body) => {
+    requests.push(body);
+    res.end(JSON.stringify({ choices: [{ finish_reason: 'length', message: { content } }] }));
+  });
+  for (content of ['{"partial":true}', '{"partial":', null]) {
+    await assert.rejects(
+      completeJson({ kind: 'compatible', url: base, model: 'test' }, { system: 'system', prompt: 'prompt', schema: { type: 'object' }, maxTokens: 2048 }),
+      error => error instanceof ProviderError && error.status === 502 && /长度上限/.test(error.message)
+    );
+  }
+  assert.equal(requests.length, 3, '输出截断不应触发不带 JSON 格式的回退请求');
+  for (const request of requests) assert.equal(request.max_tokens, 2048);
+});
+
+test('the compatible plain-format fallback also rejects a length-truncated response', async t => {
+  const requests = [];
+  const base = await serveJson(t, (_req, res, body) => {
+    requests.push(body);
+    if (requests.length === 1) { res.writeHead(400); res.end('{}'); }
+    else res.end(JSON.stringify({ choices: [{ finish_reason: 'length', message: { content: '{"ok":true}' } }] }));
+  });
+  await assert.rejects(
+    completeJson({ kind: 'compatible', url: base, model: 'test' }, { system: 'system', prompt: 'prompt', schema: { type: 'object' } }),
+    error => error instanceof ProviderError && error.status === 502 && /长度上限/.test(error.message)
+  );
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0].response_format.type, 'json_object');
+  assert.equal(Object.hasOwn(requests[1], 'response_format'), false);
+});
+
+test('runtime and environment API keys are sent only to their own configured base URLs', async t => {
+  const requests = [];
+  const respond = (req, res, body) => {
+    requests.push({ url: req.url, authorization: req.headers.authorization, body });
+    res.end(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: '{"ok":true}' } }] }));
+  };
+  const base = await serveJson(t, respond);
+  const otherBase = await serveJson(t, respond);
+  configure(t, { AI_PROVIDER: 'openai-compatible', AI_BASE_URL: `${base}/environment/`, AI_MODEL: 'test', AI_API_KEY: 'synthetic-environment-secret' });
+  setCloudConfig({ baseUrl: `${base}/runtime`, model: 'runtime-model', apiKey: 'synthetic-runtime-secret' });
+  t.after(() => setCloudConfig(null));
+  const cases = [
+    { url: `${base}/runtime`, expected: 'Bearer synthetic-runtime-secret' },
+    { url: `${base}/environment`, expected: 'Bearer synthetic-environment-secret' },
+    { url: `${base}/unrelated`, expected: undefined },
+    { url: `${base}/runtime-other`, expected: undefined },
+    { url: `${otherBase}/runtime`, expected: undefined },
+    { url: `${base}/runtime`, apiKey: '', expected: undefined },
+    { url: `${otherBase}/probe`, apiKey: 'synthetic-explicit-secret', expected: 'Bearer synthetic-explicit-secret' }
+  ];
+  for (const { expected, ...provider } of cases) {
+    await completeJson({ kind: 'compatible', model: 'test', ...provider }, { system: 'system', prompt: 'prompt', schema: { type: 'object' } });
+    assert.equal(requests.at(-1).authorization, expected, provider.url);
+    assert.ok(!JSON.stringify(requests.at(-1).body).includes('secret'), '密钥不得进入提示或请求正文');
+  }
+  assert.equal(requests.length, cases.length);
+});
+
+test('an expired connection probe reports a timeout and sends no request', async t => {
+  let calls = 0;
+  const base = await serveJson(t, (_req, res) => { calls++; res.end('{}'); });
+  const timeoutSignal = AbortSignal.timeout(1);
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(timeoutSignal.aborted, true);
+  const cancelled = new AbortController();
+  cancelled.abort();
+  for (const [signal, expectedStatus] of [[timeoutSignal, 504], [cancelled.signal, 499]]) {
+    await assert.rejects(
+      completeJson({ kind: 'compatible', url: base, model: 'test' }, { system: 'system', prompt: 'prompt', schema: { type: 'object' }, signal }),
+      error => error instanceof ProviderError && error.status === expectedStatus && (expectedStatus === 504 ? /超时/.test(error.message) : /取消/.test(error.message))
+    );
+  }
+  assert.equal(calls, 0);
+});
+
+test('an in-flight connection probe timeout aborts the transport and stays distinct from user cancellation', async t => {
+  let calls = 0, requestStarted, connectionClosed;
+  const started = new Promise(resolve => { requestStarted = resolve; });
+  const closed = new Promise(resolve => { connectionClosed = resolve; });
+  const base = await serveJson(t, (_req, res) => {
+    calls++;
+    res.on('close', connectionClosed);
+    requestStarted();
+  });
+  const timeoutController = new AbortController();
+  const job = completeJson({ kind: 'compatible', url: base, model: 'test' }, { system: 'system', prompt: 'prompt', schema: { type: 'object' }, signal: timeoutController.signal });
+  await started;
+  timeoutController.abort(new DOMException('Synthetic probe deadline', 'TimeoutError'));
+  await assert.rejects(job, error => error instanceof ProviderError && error.status === 504 && /超时/.test(error.message) && !/取消/.test(error.message));
+  await closed;
+  assert.equal(calls, 1);
 });

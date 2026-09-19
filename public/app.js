@@ -1,6 +1,7 @@
 import { DEMO_PROMPT, DEMO_ESSAY, DEMO_ANALYSIS } from './demo.js';
 import { escapeHtml as e, countWords, formatBand, formatRange, annotate, issueAnnotation, normalizeAnswer, makeCardId, nextReview } from './utils.js';
 import { initLocalAiSetup } from './local-ai-setup.js';
+import { initCloudAiSetup } from './cloud-ai-setup.js';
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -64,6 +65,8 @@ let providerSwitching = false;
 let connectionRequest = 0;
 // 准备本地模型时锁住分析入口，避免下载和写作分析同时占用服务。
 let localAiBusy = false;
+let cloudAiBusy = false;
+let cloudAiSetup = null;
 
 function toast(message) {
   clearTimeout(toastTimer);
@@ -97,8 +100,9 @@ function updateProviderControls(info = providerInfo) {
   const select = $('#provider-select');
   if (!select) return;
   select.value = providerInfo.selected || 'auto';
-  select.title = providerInfo.message || '选择下一篇分析使用的 AI 服务；密钥仅在服务器配置。';
-  select.disabled = state.busy || providerSwitching;
+  select.title = providerInfo.message || '选择下一篇分析使用的 AI 服务；在线服务可在「设置在线 AI」中配置。';
+  select.disabled = state.busy || providerSwitching || localAiBusy || cloudAiBusy;
+  cloudAiSetup?.updateControls();
 }
 function updateWordCount() {
   const words = countWords(state.essay);
@@ -136,6 +140,11 @@ function renderAnalysis() {
   const notice = $('#notice');
   notice.classList.toggle('hidden', state.mode !== 'demo');
   notice.innerHTML = state.mode === 'demo' ? `${icon('spark')}<span>这是一份预设的学习示例。点击「新练习」，粘贴你的题目和作文，获得真实 AI 分析。</span>` : '';
+  const warning = $('#analysis-warning');
+  const warnings = Array.isArray(a?.warnings) ? a.warnings : [];
+  warning.classList.toggle('hidden', !warnings.length || state.busy);
+  const omitted = warnings.some(item => ['annotation_dropped', 'annotation_limit'].includes(item.code));
+  warning.textContent = warnings.length ? (omitted ? '批改已完成；部分无法核实的高亮已省略，正文和四项评分格式已通过检查。AI 判断仍可能有误，请结合原文复核。' : '批改已完成；部分格式差异已自动整理，AI 评分和建议仅供练习参考。') : '';
   $('#original-score').innerHTML = scoreMarkup(a?.originalScore);
   $('#corrected-score').innerHTML = scoreMarkup(a?.corrected.score);
   $('#model-score').innerHTML = scoreMarkup(a?.model.score);
@@ -149,14 +158,15 @@ function renderAnalysis() {
   ['copy-corrected','copy-model','rewrite'].forEach(action => $(`[data-action="${action}"]`).disabled = !a || state.busy);
   $('#model-toggle').disabled = !a || state.busy;
   $('#export-button').disabled = !a || state.busy;
-  $('#analyze-button').disabled = state.busy || localAiBusy;
+  $('#analyze-button').disabled = state.busy || localAiBusy || cloudAiBusy;
   $('#analyze-button').classList.toggle('hidden', state.busy);
   $('#cancel-button').classList.toggle('hidden', !state.busy);
   $('#prompt-input').readOnly = state.busy;
   $('#essay-input').readOnly = state.busy;
   $('#target-band').disabled = state.busy;
-  $$('[data-action="new"], [data-action="demo"], [data-action="history"], [data-action="analyze"]').forEach(button=>button.disabled=state.busy || providerSwitching || localAiBusy);
-  $('#provider-select').disabled = state.busy || providerSwitching || localAiBusy;
+  $$('[data-action="new"], [data-action="demo"], [data-action="history"], [data-action="analyze"]').forEach(button=>button.disabled=state.busy || providerSwitching || localAiBusy || cloudAiBusy);
+  $('#provider-select').disabled = state.busy || providerSwitching || localAiBusy || cloudAiBusy;
+  cloudAiSetup?.updateControls();
   renderPriorities();
   renderReview();
 }
@@ -231,8 +241,19 @@ function clearResult() {
 $('#prompt-input').addEventListener('input', event=>{ clearResult(); state.prompt=event.target.value; scheduleSave(); });
 $('#essay-input').addEventListener('input', event=>{ clearResult(); state.essay=event.target.value; updateWordCount(); scheduleSave(); });
 $('#target-band').addEventListener('change', event=>{ clearResult(); state.targetBand=Number(event.target.value); scheduleSave(); });
-$('#provider-select').addEventListener('change', event=>{ switchProvider(event.target.value); });
+$('#provider-select').addEventListener('change', event=>{ selectProvider(event.target.value); });
 window.addEventListener('pagehide', saveDraft);
+
+async function selectProvider(next) {
+  if (state.busy || providerSwitching || localAiBusy || cloudAiBusy) { updateProviderControls(); return; }
+  if (next === 'openai-compatible') {
+    try {
+      const settings = await cloudAiSetup?.refresh();
+      if (!settings?.configured && !settings?.environmentConfigured) { updateProviderControls(); await cloudAiSetup?.open(); return; }
+    } catch { updateProviderControls(); await cloudAiSetup?.open(); return; }
+  }
+  await switchProvider(next);
+}
 
 async function checkConnection() {
   const el = $('#connection-status');
@@ -244,12 +265,12 @@ async function checkConnection() {
     if (requestId !== connectionRequest) return;
     connection = result;
     updateProviderControls(connection);
-    el.innerHTML = `<span class="status-dot ${connection.available?'':'offline'}"></span>${connection.available?'AI 已就绪':'AI 暂未连接'}`;
+    el.innerHTML = `<span class="status-dot ${connection.available?'':'offline'}"></span>${connection.available?'模型已连接':'AI 暂未连接'}`;
     el.title = connection.message || '';
   } catch { if(requestId !== connectionRequest)return; connection={available:false,checked:true}; el.innerHTML='<span class="status-dot offline"></span>服务未连接'; el.title='请运行 npm start，或双击项目目录中的 Start Writing Studio.cmd。'; updateProviderControls(); }
 }
 async function switchProvider(next) {
-  if (state.busy || providerSwitching) return;
+  if (state.busy || providerSwitching || cloudAiBusy) return;
   if (!['auto','ollama','codex','openai-compatible'].includes(next)) return;
   providerSwitching = true; $('#provider-select').disabled = true; $('#analyze-button').disabled = true;
   ++connectionRequest;
@@ -261,7 +282,7 @@ async function switchProvider(next) {
     providerInfo = result; updateProviderControls(result);
     const label = result.provider === 'ollama' ? '本地 AI' : result.provider === 'codex' ? 'Codex' : result.engine || '所选 AI';
     toast(`已切换到 ${label}。${result.available?'可以开始分析。':result.message || '当前模式尚未连接。'}`);
-    const el=$('#connection-status');el.innerHTML=`<span class="status-dot ${result.available?'':'offline'}"></span>${result.available?'AI 已就绪':'AI 暂未连接'}`;el.title=result.message||'';
+    const el=$('#connection-status');el.innerHTML=`<span class="status-dot ${result.available?'':'offline'}"></span>${result.available?'模型已连接':'AI 暂未连接'}`;el.title=result.message||'';
   } catch (error) {
     toast(error.name === 'TimeoutError' ? '切换等待超时，正在重新检查当前 AI 模式。' : error.message || '切换 AI 模式失败。');
     // 响应中断前，服务端可能已经接受了这次切换。
@@ -271,7 +292,7 @@ async function switchProvider(next) {
 }
 function showError(message) { $('#error').textContent = message; $('#error').classList.remove('hidden'); $('#error').scrollIntoView({behavior:'smooth',block:'center'}); }
 async function analyze() {
-  if (state.busy || providerSwitching) return;
+  if (state.busy || providerSwitching || localAiBusy || cloudAiBusy) return;
   if (!state.prompt.trim()) { showError('先粘贴完整的作文题目，包含最后的提问要求。'); $('#prompt-input').focus(); return; }
   if (countWords(state.essay) < 40) { showError('请先写下至少 40 个英文词，再开始分析。完整 Task 2 作文建议至少 250 词。'); state.originalView='edit';renderOriginal(); $('#essay-input').focus(); return; }
   const previous = { analysis:state.analysis,mode:state.mode,id:state.id,originalView:state.originalView,modelOpen:state.modelOpen,analyzedAt:state.analyzedAt };
@@ -392,7 +413,7 @@ function exportNotes() {
   toast('学习笔记已导出，包含三篇作文、评分和复习内容。');
 }
 function showAbout() {
-  openModal('写作工作台 · 使用与评分说明',`<div class="about-content"><h3>一次练习，走完一个学习闭环</h3><ol><li>粘贴完整 Task 2 题目，在左栏写作。建议 40 分钟、至少 250 词。</li><li>点击「开始分析」，先看三个重点，再点击原文和精修版的高亮。</li><li>中栏保留观点做必要修改；右栏只根据题目独立创作，可按需展开。</li><li>收藏常犯错误和好表达，通过换题造句与间隔复习形成记忆。</li></ol><h3>评分怎么看</h3><p>采用 Task 2 的四项标准：任务回应 TR、连贯与衔接 CC、词汇资源 LR、语法多样性与准确性 GRA。单篇四项等权，展示 AI 参考区间与文本证据。</p><p>这是练习估分，不能替代正式考试结果。语法修正不一定改善论证，范文也不会自动获得满分。此页面不提供包含 Task 1 的完整 Writing 成绩。</p><h3>关于保存与 AI</h3><p>草稿、最近 30 篇练习和复习卡保存在当前浏览器。清除浏览器数据会移除这些记录，请通过「导出学习笔记」备份。</p><p>真实分析使用本机已配置的 AI 服务，将题目和作文发送到该服务，使用相应账户额度。无需在网页输入密钥。示例为预设内容，服务失败时不会拿示例冒充分析结果。</p><p>小练习的答案对照与搭配检查为本地检查；「用上了搭配」不代表整句语法已通过 AI 审核。</p><a href="https://ielts.org/take-a-test/your-results/ielts-scoring-in-detail" target="_blank" rel="noopener noreferrer">查看 IELTS 官方评分说明 ↗</a></div>`);
+  openModal('写作工作台 · 使用与评分说明',`<div class="about-content"><h3>一次练习，走完一个学习闭环</h3><ol><li>粘贴完整 Task 2 题目，在左栏写作。建议 40 分钟、至少 250 词。</li><li>点击「开始分析」，先看三个重点，再点击原文和精修版的高亮。</li><li>中栏保留观点做必要修改；右栏只根据题目独立创作，可按需展开。</li><li>收藏常犯错误和好表达，通过换题造句与间隔复习形成记忆。</li></ol><h3>评分怎么看</h3><p>采用 Task 2 的四项标准：任务回应 TR、连贯与衔接 CC、词汇资源 LR、语法多样性与准确性 GRA。单篇四项等权，展示 AI 参考区间与文本证据。</p><p>这是练习估分，不能替代正式考试结果。语法修正不一定改善论证，范文也不会自动获得满分。此页面不提供包含 Task 1 的完整 Writing 成绩。</p><h3>关于保存与 AI</h3><p>草稿、最近 30 篇练习和复习卡保存在当前浏览器。清除浏览器数据会移除这些记录，请通过「导出学习笔记」备份。</p><p>本地 Ollama 在你的电脑上分析作文；在线 AI 会将题目和作文发送给所选服务商，使用你的账户额度。在线设置中输入的 API 密钥只保存在本机应用配置，不写入练习记录，可以随时删除。Codex 模式使用本机已有配置。示例为预设内容，服务失败时不会拿示例冒充分析结果。</p><p>小练习的答案对照与搭配检查为本地检查；「用上了搭配」不代表整句语法已通过 AI 审核。</p><a href="https://ielts.org/take-a-test/your-results/ielts-scoring-in-detail" target="_blank" rel="noopener noreferrer">查看 IELTS 官方评分说明 ↗</a></div>`);
 }
 
 document.addEventListener('click', async event=>{
@@ -475,16 +496,26 @@ document.addEventListener('keydown',event=>{
 });
 renderAll();
 setMobileTab('original');
-checkConnection();
+const initialConnection = checkConnection();
+cloudAiSetup = initCloudAiSetup({
+  isBusy: () => state.busy || providerSwitching || localAiBusy,
+  onBusyChange: busy => { cloudAiBusy = busy; renderAnalysis(); },
+  onConnected: async () => { await checkConnection(); toast('在线 AI 连接已验证，可以开始分析；题目和草稿已保留。'); },
+  onCleared: checkConnection,
+  onRefresh: checkConnection,
+});
 initLocalAiSetup({
   // 供本地 AI 卡片判断是否正在分析；卡片自身不维护作文状态。
-  isAnalyzing: () => state.busy,
+  isAnalyzing: () => state.busy || providerSwitching || cloudAiBusy,
   onStateChange: status => {
     localAiBusy = Boolean(status.busy);
     renderAnalysis();
   },
-  onReady: async () => {
+  onReady: async ({ automatic = false } = {}) => {
     localAiBusy = false;
+    await initialConnection;
+    // 启动时保留用户已选择的在线服务；只有主动准备/选择本地 AI 才切换。
+    if (automatic && !['auto', 'ollama'].includes(providerInfo.selected)) { renderAnalysis(); return; }
     // 管理器使用独立端口；通过本地接口切换后端，避免误连系统中的其他 Ollama。
     await switchProvider('ollama');
     renderAnalysis();

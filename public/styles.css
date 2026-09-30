@@ -872,3 +872,5 @@ h1 > span { color: #7d9170; }
   .priority-item { padding-top: 10px; padding-bottom: 10px; }
   .score-block, .priority-strip, .review-card { print-color-adjust: exact; }
 }
+/* 按钮布局不能覆盖原生 hidden 属性，更新不可用时不显示安装入口。 */
+#update-install[hidden] { display: none !important; }

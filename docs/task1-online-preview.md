@@ -38,7 +38,7 @@ DeepSeek、豆包聊天或元宝的网页版登录状态、聊天会员，不能
 
 验证记录见 [本地测试报告](task1-preview-verification.md)。自动格式检查不能证明评分等同于雅思考官。
 
-已准备 macOS、Windows、Linux 的 CI 测试矩阵；因为本次暂不上传 GitHub，尚未触发 macOS 测试。当前没有 Mac 真机，不能验证 Safari、系统安全提示、安装器或苹果芯片本地推理。Windows 一键准备 Ollama 的实现不能直接当成 Mac 安装器。待用户确认本地功能后，再运行 macOS CI 并决定 Mac 发布包。
+macOS、Windows、Linux 的 Node 22/24 测试矩阵，以及 macOS arm64/x64 的打包与启动检查已通过。Mac 包包含 Node 运行时，使用 `.command` 启动；未签名或公证。没有用户 Mac 真机，因此未验证 Safari、Gatekeeper 操作或 Mac 本地 AI 推理。Windows 一键准备 Ollama 不适用于 Mac。见 [v0.2.0 验证记录](release-verification-v0.2.0.md)。
 
 ## 官方接入资料
 

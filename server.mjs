@@ -256,7 +256,7 @@ export function createServer({ analyze = analyzeWriting, status = getEngineStatu
           const result = await updater.install({port:server.address().port});
           sendJson(res, 202, result);
           // 先返回结果，让网页保存状态；辅助进程等待本服务退出后才覆盖安装。
-          setTimeout(async () => { await localAI.close(); server.close(); shutdown(); }, 800).unref();
+          setTimeout(async () => { try { await localAI.close(); } finally { server.close(); shutdown(); } }, 800).unref();
         } catch (error) { switching = false; throw error; }
         return;
       }

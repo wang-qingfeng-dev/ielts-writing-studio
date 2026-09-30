@@ -11,9 +11,10 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
         node: [22, 24]
     steps:
       - name: Check out repository
@@ -23,4 +24,4 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
       - name: Run unit and integration tests
-        run: node --test tests/*.test.mjs
+        run: node --test --test-concurrency=1 tests/*.test.mjs

@@ -1,7 +1,7 @@
 ﻿param(
     [string]$SourceRef = 'main',
     [ValidatePattern('^v\d+\.\d+\.\d+$')]
-    [string]$ReleaseVersion = 'v0.1.2',
+    [string]$ReleaseVersion = 'v0.2.0',
     [ValidatePattern('^v24\.\d+\.\d+$')]
     [string]$NodeVersion = 'v24.19.0',
     [string]$OutputDir,
@@ -52,6 +52,7 @@ foreach ($optionalRuntimePath in @('node_modules', 'npm', 'npx', 'corepack', 'co
 }
 
 # 安装后的 AI 设置入口统一打开应用内选择页，不把模型放进安装器。
+[IO.File]::WriteAllText((Join-Path $sourceRoot 'INSTALLATION.json'), '{"kind":"windows-installer"}', [Text.Encoding]::ASCII)
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'setup-ai.ps1') -Destination (Join-Path $sourceRoot 'setup-ai.ps1')
 $setupCmd = @('@echo off', 'setlocal', 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0setup-ai.ps1" %*', 'if errorlevel 1 pause', 'endlocal') -join "`r`n"
 [IO.File]::WriteAllText((Join-Path $sourceRoot 'Setup AI.cmd'), $setupCmd, [Text.Encoding]::ASCII)

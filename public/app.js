@@ -2,11 +2,13 @@ import { DEMO_PROMPT, DEMO_ESSAY, DEMO_ANALYSIS } from './demo.js';
 import { escapeHtml as e, countWords, formatBand, formatRange, annotate, issueAnnotation, normalizeAnswer, makeCardId, nextReview } from './utils.js';
 import { initLocalAiSetup } from './local-ai-setup.js';
 import { initCloudAiSetup } from './cloud-ai-setup.js';
+import { taskProfile } from './writing-task.js';
+import { initAppUpdates } from './app-updates.js';
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const KEYS = { draft:'jujin.draft.v1', history:'jujin.history.v1', library:'jujin.library.v1' };
-const CRITERIA = { TR:'任务回应', CC:'连贯与衔接', LR:'词汇资源', GRA:'语法多样性与准确性' };
+const CRITERIA = { TR:'任务回应', TA:'任务完成度', CC:'连贯与衔接', LR:'词汇资源', GRA:'语法多样性与准确性' };
 const CATEGORIES = { grammar:'语法', spelling:'拼写', vocabulary:'词汇 / 搭配', logic:'论证 / 衔接' };
 const ICONS = {
   history:'<path d="M3 11a9 9 0 1 1 2.7 7.2M3 4v7h7"/><path d="M12 7v5l3 2"/>',
@@ -47,6 +49,8 @@ const state = validDraft ? { ...draft } : {
   analysis: structuredClone(DEMO_ANALYSIS), mode:'demo', modelOpen:true,
 };
 state.busy = false;
+state.taskType ||= 'task2';
+state.taskData ||= '';
 state.createdAt ||= state.date || Date.now();
 state.analyzedAt ||= state.analysis && state.mode !== 'demo' ? state.date || state.createdAt : null;
 state.originalView = state.analysis ? 'review' : 'edit';
@@ -76,7 +80,7 @@ function toast(message) {
 }
 function saveDraft() {
   clearTimeout(saveTimer);
-  const current = { id:state.id,prompt:state.prompt,essay:state.essay,targetBand:state.targetBand,analysis:state.analysis,mode:state.mode,modelOpen:state.modelOpen,createdAt:state.createdAt,analyzedAt:state.analyzedAt };
+  const current = { id:state.id,taskType:state.taskType,taskData:state.taskData,prompt:state.prompt,essay:state.essay,targetBand:state.targetBand,analysis:state.analysis,mode:state.mode,modelOpen:state.modelOpen,createdAt:state.createdAt,analyzedAt:state.analyzedAt };
   // 重试期间刷新页面时，必须保留最近一次完成的结果。
   const saved = write(KEYS.draft, state.busy && analysisBackup ? { ...current, ...analysisBackup } : current);
   $('#save-state').textContent = saved ? '已自动保存到本机' : '未能保存，请导出笔记';
@@ -86,7 +90,7 @@ function saveHistory() {
   if (state.mode === 'demo' || (!state.essay.trim() && !state.prompt.trim())) return;
   const previousRecord = history.find(item => item.id === state.id);
   if (!state.analysis && previousRecord?.analysis) return;
-  const record = { id:state.id,prompt:state.prompt,essay:state.essay,targetBand:state.targetBand,analysis:state.analysis,date:state.analyzedAt || state.createdAt,createdAt:state.createdAt,analyzedAt:state.analyzedAt,mode:'real' };
+  const record = { id:state.id,taskType:state.taskType,taskData:state.taskData,prompt:state.prompt,essay:state.essay,targetBand:state.targetBand,analysis:state.analysis,date:state.analyzedAt || state.createdAt,createdAt:state.createdAt,analyzedAt:state.analyzedAt,mode:'real' };
   history = [record, ...history.filter(item => item.id !== state.id)].sort((a,b)=>b.date-a.date).slice(0, 30);
   write(KEYS.history, history);
   updateCounters();
@@ -106,12 +110,13 @@ function updateProviderControls(info = providerInfo) {
 }
 function updateWordCount() {
   const words = countWords(state.essay);
+  const { minimum } = taskProfile(state.taskType);
   $('#word-count').textContent = `${words} words`;
-  $('#word-hint').textContent = words === 0 ? '写下你的第一个观点' : words < 250 ? `距离 250 词还差 ${250 - words} 词` : words > 350 ? '检查是否可以更简洁' : '字数达标，关注论证质量';
-  $('#word-hint').classList.toggle('word-warning', words > 0 && words < 250);
+  $('#word-hint').textContent = words === 0 ? '开始写下你的回答' : words < minimum ? `距离 ${minimum} 词还差 ${minimum - words} 词` : words > minimum + 100 ? '检查是否可以更简洁' : '字数达标，关注内容质量';
+  $('#word-hint').classList.toggle('word-warning', words > 0 && words < minimum);
 }
 function scoreMarkup(score) {
-  if (!score) return `<div class="score-heading"><span>预估 Band</span><span class="score-value score-placeholder">—</span></div><p class="score-note">完成分析后，查看四项评分与具体依据</p><div class="criteria-grid">${Object.entries(CRITERIA).map(([key,name])=>`<div class="criterion"><div class="criterion-top"><span class="criterion-code">${key}</span><span class="criterion-name">${name}</span><span class="criterion-band">—</span></div><div class="criterion-track"><span style="width:0%"></span></div></div>`).join('')}</div>`;
+  if (!score) return `<div class="score-heading"><span>预估 Band</span><span class="score-value score-placeholder">—</span></div><p class="score-note">完成分析后，查看四项评分与具体依据</p><div class="criteria-grid">${Object.entries(CRITERIA).filter(([key])=> !['TR','TA'].includes(key) || key===taskProfile(state.taskType).criterion).map(([key,name])=>`<div class="criterion"><div class="criterion-top"><span class="criterion-code">${key}</span><span class="criterion-name">${name}</span><span class="criterion-band">—</span></div><div class="criterion-track"><span style="width:0%"></span></div></div>`).join('')}</div>`;
   return `<div class="score-heading"><div><span>预估 Band</span><p class="score-note">单篇作文 · AI 参考区间</p></div><span class="score-value">${e(formatRange(score))}</span></div><div class="criteria-grid">${score.criteria.map(item=>`<div class="criterion"><div class="criterion-top"><span class="criterion-code">${e(item.key)}</span><span class="criterion-name">${e(CRITERIA[item.key])}</span><span class="criterion-band">${e(formatBand(item.band))}</span></div><div class="criterion-track"><span style="width:${Math.max(0,Math.min(100,item.band / 9 * 100))}%"></span></div></div>`).join('')}</div><details class="score-details"><summary>评分依据与提升建议 <span>＋</span></summary>${score.criteria.map(item=>`<div class="criterion-detail"><strong>${e(item.key)} · ${e(CRITERIA[item.key])} <span>${e(formatBand(item.band))}</span></strong><p>${e(item.evidence)}</p><p class="criterion-action"><span>下一步</span>${e(item.action)}</p></div>`).join('')}</details>`;
 }
 function emptyPanel(kind) {
@@ -135,6 +140,8 @@ function renderOriginal() {
 }
 function renderAnalysis() {
   const a = state.analysis;
+  $('#task-type').disabled = state.busy;
+  $('#task-data').disabled = state.busy;
   renderOriginal();
   $('#mode-label').textContent = state.busy ? '正在深度分析' : state.mode === 'demo' ? '示例体验' : a ? '本次分析已完成' : '开始一篇新练习';
   const notice = $('#notice');
@@ -187,8 +194,8 @@ function renderModel() {
 }
 function renderPriorities() {
   $('#priorities').innerHTML = `<div class="priority-intro"><span class="priority-icon">${icon('target')}</span><div><span class="eyebrow">FOCUS ON WHAT MATTERS</span><h2>本次，先做好这三件事</h2></div></div>${(state.analysis?.priorities || [
-    {title:'先完整回答题目',description:'明确立场，覆盖题目要求的每个部分。'},
-    {title:'让观点有充分支撑',description:'解释为什么，再给出具体例子或结果。'},
+    {title:'先完整回答题目',description:taskProfile(state.taskType).guidance},
+    {title:state.taskType==='task1-academic'?'概述并比较主要特征':state.taskType==='task1-general'?'回应要点，保持语气一致':'让观点有充分支撑',description:state.taskType==='task1-academic'?'用原图核对数据、单位和时间，不编造原因。':state.taskType==='task1-general'?'明确收信人和目的，逐一回应题目要求。':'解释为什么，再给出具体例子或结果。'},
     {title:'把一个错误真正改掉',description:'分析完成后，这里会给出你的专属重点。'},
   ]).map((item,i)=>`<div class="priority-item"><span class="priority-index">0${i+1}</span><div><h3>${e(item.title)}</h3><p>${e(item.description)}</p></div></div>`).join('')}`;
 }
@@ -218,6 +225,12 @@ function renderReview() {
   $('#review-notes').innerHTML = a.model.notes.map((item,i)=>`<article class="review-card"><div class="review-card-top"><span class="card-tag logic">${e(item.label)}</span>${bookmarkButton('note',item,i)}</div><p class="card-example note-quote" lang="en">${e(item.quote)}</p><p class="card-meaning">${e(item.explanation)}</p><button class="mini-btn" data-note-index="${i}">拆解这句话 ${icon('arrow')}</button></article>`).join('');
 }
 function renderAll() {
+  const task = taskProfile(state.taskType);
+  $('#task-type').value = state.taskType || 'task2';
+  $('#task-data').value = state.taskData || '';
+  $('#task-data-section').classList.toggle('hidden', state.taskType !== 'task1-academic');
+  $('#prompt-guidance').textContent = `建议 ${task.minutes} 分钟 · 至少 ${task.minimum} 词`;
+  $('#task-guidance').textContent = task.guidance;
   $('#prompt-input').value = state.prompt;
   $('#essay-input').value = state.essay;
   $('#target-band').value = String(state.targetBand);
@@ -241,6 +254,13 @@ function clearResult() {
 $('#prompt-input').addEventListener('input', event=>{ clearResult(); state.prompt=event.target.value; scheduleSave(); });
 $('#essay-input').addEventListener('input', event=>{ clearResult(); state.essay=event.target.value; updateWordCount(); scheduleSave(); });
 $('#target-band').addEventListener('change', event=>{ clearResult(); state.targetBand=Number(event.target.value); scheduleSave(); });
+$('#task-type').addEventListener('change', event=>{
+  if (state.busy) return;
+  saveHistory(); clearResult(); state.id=crypto.randomUUID(); state.createdAt=Date.now(); state.analyzedAt=null;
+  state.taskType=event.target.value; state.taskData='';
+  renderAll(); saveDraft();
+});
+$('#task-data').addEventListener('input', event=>{ clearResult(); state.taskData=event.target.value; scheduleSave(); });
 $('#provider-select').addEventListener('change', event=>{ selectProvider(event.target.value); });
 window.addEventListener('pagehide', saveDraft);
 
@@ -294,7 +314,8 @@ function showError(message) { $('#error').textContent = message; $('#error').cla
 async function analyze() {
   if (state.busy || providerSwitching || localAiBusy || cloudAiBusy) return;
   if (!state.prompt.trim()) { showError('先粘贴完整的作文题目，包含最后的提问要求。'); $('#prompt-input').focus(); return; }
-  if (countWords(state.essay) < 40) { showError('请先写下至少 40 个英文词，再开始分析。完整 Task 2 作文建议至少 250 词。'); state.originalView='edit';renderOriginal(); $('#essay-input').focus(); return; }
+  if (state.taskType === 'task1-academic' && (state.taskData || '').trim().length < 20) { showError('请先补充图表数据、单位和年份，或流程/地图描述（至少 20 字符）。AI 不会从你的作文猜测原图。'); $('#task-data').focus(); return; }
+  if (countWords(state.essay) < 40) { showError(`请先写下至少 40 个英文词，再开始分析。完整 ${taskProfile(state.taskType).label} 建议至少 ${taskProfile(state.taskType).minimum} 词。`); state.originalView='edit';renderOriginal(); $('#essay-input').focus(); return; }
   const previous = { analysis:state.analysis,mode:state.mode,id:state.id,originalView:state.originalView,modelOpen:state.modelOpen,analyzedAt:state.analyzedAt };
   analysisBackup = previous;
   saveHistory();
@@ -310,7 +331,7 @@ async function analyze() {
   renderAnalysis();
   progressTimer = setInterval(()=>$$('[data-elapsed]').forEach(el=>el.textContent=Math.floor((Date.now()-started)/1000)),1000);
   try {
-    const response = await fetch('/api/analyze', { method:'POST', headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:state.prompt,essay:state.essay,targetBand:state.targetBand}),signal:controller.signal });
+    const response = await fetch('/api/analyze', { method:'POST', headers:{'Content-Type':'application/json'},body:JSON.stringify({taskType:state.taskType || 'task2',taskData:state.taskData || '',prompt:state.prompt,essay:state.essay,targetBand:state.targetBand}),signal:controller.signal });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || `分析失败（${response.status}），请稍后重试。`);
     if (!result.originalScore || !result.corrected?.text || !result.model?.text || !Array.isArray(result.issues)) throw new Error('收到的分析不完整，请重试。');
@@ -333,6 +354,8 @@ async function analyze() {
 function freshExercise(useDemo=false) {
   if (state.busy) return;
   saveHistory();
+  state.taskType = useDemo ? 'task2' : state.taskType || 'task2';
+  state.taskData = '';
   Object.assign(state,{id:crypto.randomUUID(),createdAt:Date.now(),analyzedAt:null,prompt:useDemo?DEMO_PROMPT:'',essay:useDemo?DEMO_ESSAY:'',targetBand:state.targetBand,analysis:useDemo?structuredClone(DEMO_ANALYSIS):null,mode:useDemo?'demo':'real',modelOpen:useDemo,originalView:useDemo?'review':'edit'});
   practiceAnswers.clear();
   $('#error').classList.add('hidden');
@@ -394,7 +417,7 @@ function showHistory() {
   const recurring={};
   real.forEach(item=>item.analysis.issues.forEach(issue=>{recurring[issue.category]=(recurring[issue.category]||0)+1;}));
   const most=Object.entries(recurring).sort((a,b)=>b[1]-a[1])[0];
-  openModal('我的练习记录',`${real.length?`<div class="history-summary"><div><span>已完成练习</span><strong>${real.length}<small>篇</small></strong></div><div><span>首次 → 最近估分</span><strong>${e(formatRange(first))} → ${e(formatRange(recent))}</strong></div><div><span>记录中最常见的问题</span><strong>${e(most?CATEGORIES[most[0]]:'暂无明显错误')}</strong></div></div><p class="score-note">题目与难度不同，单次估分变化不等于稳定进步。</p>`:''}${history.length?history.map(item=>`<article class="history-item"><div class="history-meta"><span>${new Date(item.date).toLocaleString('zh-CN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</span><span>${countWords(item.essay)} words · ${item.analysis?`Band ${e(formatRange(item.analysis.originalScore))}`:'未分析的草稿'}</span></div><h3 class="history-title">${e(item.prompt || '未填写题目')}</h3><div class="history-actions"><button class="btn btn-secondary btn-small" data-history-id="${e(item.id)}">打开这篇练习 ${icon('arrow')}</button></div></article>`).join(''):`<div class="empty-library">${icon('history')}<h3>你的进步，会留在这里。</h3><p>真实练习和草稿会自动保留。示例体验不会计入记录。</p></div>`}`,`<span class="score-note">仅保存在当前浏览器，最多保留最近 30 篇。</span>`);
+  openModal('我的练习记录',`${real.length?`<div class="history-summary"><div><span>已完成练习</span><strong>${real.length}<small>篇</small></strong></div><div><span>首次 → 最近估分</span><strong>${e(formatRange(first))} → ${e(formatRange(recent))}</strong></div><div><span>记录中最常见的问题</span><strong>${e(most?CATEGORIES[most[0]]:'暂无明显错误')}</strong></div></div><p class="score-note">不同题型、题目和难度的估分不可直接比较，单次变化不等于稳定进步。</p>`:''}${history.length?history.map(item=>`<article class="history-item"><div class="history-meta"><span>${new Date(item.date).toLocaleString('zh-CN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</span><span>${e(taskProfile(item.taskType).label)} · ${countWords(item.essay)} words · ${item.analysis?`Band ${e(formatRange(item.analysis.originalScore))}`:'未分析的草稿'}</span></div><h3 class="history-title">${e(item.prompt || '未填写题目')}</h3><div class="history-actions"><button class="btn btn-secondary btn-small" data-history-id="${e(item.id)}">打开这篇练习 ${icon('arrow')}</button></div></article>`).join(''):`<div class="empty-library">${icon('history')}<h3>你的进步，会留在这里。</h3><p>真实练习和草稿会自动保留。示例体验不会计入记录。</p></div>`}`,`<span class="score-note">仅保存在当前浏览器，最多保留最近 30 篇。</span>`);
 }
 function showLibrary(reset=false) {
   if(reset)libraryView={all:false,index:0,revealed:false};
@@ -407,13 +430,13 @@ function showLibrary(reset=false) {
 function exportNotes() {
   const a=state.analysis;if(!a)return;
   const scoreText=score=>`预估 Band：${formatRange(score)}\n\n${score.criteria.map(item=>`- ${item.key} ${CRITERIA[item.key]}：${formatBand(item.band)}\n  依据：${item.evidence}\n  建议：${item.action}`).join('\n')}`;
-  const content=`# 句进 · 雅思写作学习笔记\n\n${state.mode==='demo'?'预设示例，供学习体验。\n\n':''}日期：${new Date().toLocaleDateString('zh-CN')}\n目标：Band ${formatBand(state.targetBand)}\nAI 练习估分，非官方成绩。\n\n## 题目\n\n${state.prompt}\n\n## 我的原文\n\n${state.essay}\n\n${scoreText(a.originalScore)}\n\n## 精修版本\n\n${a.corrected.text}\n\n${scoreText(a.corrected.score)}\n\n## 独立范文\n\n${a.model.text}\n\n${scoreText(a.model.score)}\n\n## 本次提分重点\n\n${a.priorities.map((item,i)=>`${i+1}. ${item.title}：${item.description}`).join('\n')}\n\n## 易错点\n\n${a.issues.map(item=>`### ${CATEGORIES[item.category]}\n\n原句：${item.original}\n\n修改：${item.replacement}\n\n原因：${item.explanation}\n\n练习：${item.practice.question}\n\n参考答案：${item.practice.answer}`).join('\n\n')}\n\n## 实用搭配\n\n${a.expressions.map(item=>`### ${item.text}\n\n${item.meaning}\n\n用法：${item.usage}\n\n例句：${item.example}`).join('\n\n')}\n\n## 好句与论证\n\n${a.model.notes.map(item=>`### ${item.label}\n\n${item.quote}\n\n${item.explanation}`).join('\n\n')}\n`;
+  const content=`# 句进 · 雅思写作学习笔记\n\n${state.mode==='demo'?'预设示例，供学习体验。\n\n':''}日期：${new Date().toLocaleDateString('zh-CN')}\n目标：Band ${formatBand(state.targetBand)}\nAI 练习估分，非官方成绩。\n\n## 题型\n\n${taskProfile(state.taskType).label}\n\n## 题目\n\n${state.prompt}${state.taskType==='task1-academic' ? '\n\n## 原图文字材料\n\n'+state.taskData : ''}\n\n## 我的原文\n\n${state.essay}\n\n${scoreText(a.originalScore)}\n\n## 精修版本\n\n${a.corrected.text}\n\n${scoreText(a.corrected.score)}\n\n## 独立范文\n\n${a.model.text}\n\n${scoreText(a.model.score)}\n\n## 本次提分重点\n\n${a.priorities.map((item,i)=>`${i+1}. ${item.title}：${item.description}`).join('\n')}\n\n## 易错点\n\n${a.issues.map(item=>`### ${CATEGORIES[item.category]}\n\n原句：${item.original}\n\n修改：${item.replacement}\n\n原因：${item.explanation}\n\n练习：${item.practice.question}\n\n参考答案：${item.practice.answer}`).join('\n\n')}\n\n## 实用搭配\n\n${a.expressions.map(item=>`### ${item.text}\n\n${item.meaning}\n\n用法：${item.usage}\n\n例句：${item.example}`).join('\n\n')}\n\n## 好句与论证\n\n${a.model.notes.map(item=>`### ${item.label}\n\n${item.quote}\n\n${item.explanation}`).join('\n\n')}\n`;
   const url=URL.createObjectURL(new Blob(['\ufeff',content],{type:'text/markdown;charset=utf-8'}));
   const link=document.createElement('a');link.href=url;link.download=`句进-写作笔记-${new Date().toISOString().slice(0,10)}.md`;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
   toast('学习笔记已导出，包含三篇作文、评分和复习内容。');
 }
 function showAbout() {
-  openModal('写作工作台 · 使用与评分说明',`<div class="about-content"><h3>一次练习，走完一个学习闭环</h3><ol><li>粘贴完整 Task 2 题目，在左栏写作。建议 40 分钟、至少 250 词。</li><li>点击「开始分析」，先看三个重点，再点击原文和精修版的高亮。</li><li>中栏保留观点做必要修改；右栏只根据题目独立创作，可按需展开。</li><li>收藏常犯错误和好表达，通过换题造句与间隔复习形成记忆。</li></ol><h3>评分怎么看</h3><p>采用 Task 2 的四项标准：任务回应 TR、连贯与衔接 CC、词汇资源 LR、语法多样性与准确性 GRA。单篇四项等权，展示 AI 参考区间与文本证据。</p><p>这是练习估分，不能替代正式考试结果。语法修正不一定改善论证，范文也不会自动获得满分。此页面不提供包含 Task 1 的完整 Writing 成绩。</p><h3>关于保存与 AI</h3><p>草稿、最近 30 篇练习和复习卡保存在当前浏览器。清除浏览器数据会移除这些记录，请通过「导出学习笔记」备份。</p><p>本地 Ollama 在你的电脑上分析作文；在线 AI 会将题目和作文发送给所选服务商，使用你的账户额度。在线设置中输入的 API 密钥只保存在本机应用配置，不写入练习记录，可以随时删除。Codex 模式使用本机已有配置。示例为预设内容，服务失败时不会拿示例冒充分析结果。</p><p>小练习的答案对照与搭配检查为本地检查；「用上了搭配」不代表整句语法已通过 AI 审核。</p><a href="https://ielts.org/take-a-test/your-results/ielts-scoring-in-detail" target="_blank" rel="noopener noreferrer">查看 IELTS 官方评分说明 ↗</a></div>`);
+  openModal('写作工作台 · 使用与评分说明',`<div class="about-content"><h3>一次练习，走完一个学习闭环</h3><ol><li>选择题型并粘贴完整题目。Task 1 建议 20 分钟、150 词；Task 2 建议 40 分钟、250 词。学术类 Task 1 还需填写原图数据或流程/地图描述。</li><li>点击「开始分析」，先看三个重点，再点击原文和精修版的高亮。</li><li>中栏保留观点做必要修改；右栏只根据题目独立创作，可按需展开。</li><li>收藏常犯错误和好表达，通过换题造句与间隔复习形成记忆。</li></ol><h3>评分怎么看</h3><p>Task 1 使用任务完成度 TA，Task 2 使用任务回应 TR；其余三项为连贯与衔接 CC、词汇资源 LR、语法多样性与准确性 GRA。单篇四项等权，展示 AI 参考区间与文本证据。</p><p>这是练习估分，不能替代正式考试结果。语法修正不一定改善论证，范文也不会自动获得满分。这里评估单篇作文，不计算整场 Writing 总成绩。</p><h3>关于保存与 AI</h3><p>草稿、最近 30 篇练习和复习卡保存在当前浏览器。清除浏览器数据会移除这些记录，请通过「导出学习笔记」备份。</p><p>本地 Ollama 在你的电脑上分析作文；在线 AI 会将题目和作文发送给所选服务商，使用你的账户额度。在线设置中输入的 API 密钥只保存在本机应用配置，不写入练习记录，可以随时删除。Codex 模式使用本机已有配置。示例为预设内容，服务失败时不会拿示例冒充分析结果。</p><p>小练习的答案对照与搭配检查为本地检查；「用上了搭配」不代表整句语法已通过 AI 审核。</p><a href="https://ielts.org/take-a-test/your-results/ielts-scoring-in-detail" target="_blank" rel="noopener noreferrer">查看 IELTS 官方评分说明 ↗</a></div>`);
 }
 
 document.addEventListener('click', async event=>{
@@ -450,7 +473,7 @@ document.addEventListener('click', async event=>{
   if(data.historyId){
     const item=history.find(record=>record.id===data.historyId);if(!item)return;
     $('#error').classList.add('hidden');
-    saveHistory();practiceAnswers.clear();Object.assign(state,structuredClone(item),{createdAt:item.createdAt||item.date,analyzedAt:item.analyzedAt??(item.analysis?item.date:null),originalView:item.analysis?'review':'edit',modelOpen:false});closeModal();renderAll();saveDraft();setMobileTab('original');toast('已打开练习。');return;
+    saveHistory();practiceAnswers.clear();Object.assign(state,structuredClone(item),{taskType:item.taskType||'task2',taskData:item.taskData||'',createdAt:item.createdAt||item.date,analyzedAt:item.analyzedAt??(item.analysis?item.date:null),originalView:item.analysis?'review':'edit',modelOpen:false});closeModal();renderAll();saveDraft();setMobileTab('original');toast('已打开练习。');return;
   }
   if(data.reviewCard){
     library=library.map(card=>card.id===data.reviewCard?nextReview(card,data.remembered==='true'):card);write(KEYS.library,library);libraryView.revealed=false;
@@ -497,6 +520,7 @@ document.addEventListener('keydown',event=>{
 renderAll();
 setMobileTab('original');
 const initialConnection = checkConnection();
+initAppUpdates({isBusy: () => state.busy || providerSwitching || localAiBusy || cloudAiBusy, saveDraft});
 cloudAiSetup = initCloudAiSetup({
   isBusy: () => state.busy || providerSwitching || localAiBusy,
   onBusyChange: busy => { cloudAiBusy = busy; renderAnalysis(); },

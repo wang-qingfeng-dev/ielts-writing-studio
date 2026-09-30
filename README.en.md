@@ -1,10 +1,12 @@
 # IELTS Writing Studio · 句进
 
-[简体中文](README.md) · [Download v0.1.2](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.1.2) · [Changelog](CHANGELOG.md)
+> v0.2.0 adds Academic/General Task 1, guided domestic API setup, Windows installer updates, and Mac arm64/x64 packages. See [release notes](docs/release-notes-v0.2.0.md).
 
-**v0.1.2** adds browser-based online AI setup, improves local output validation and recovery, and offers on-demand Qwen3.5:4b preparation. Computers with limited resources can use online AI without downloading a local model.
+[简体中文](README.md) · [Download v0.2.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.2.0) · [Changelog](CHANGELOG.md)
 
-A local IELTS Writing Task 2 practice app that turns essay feedback into reusable learning cards. Compare your draft, a minimally corrected version, and an independently generated model essay, then practise the language you want to retain.
+**v0.2.0** supports Task 1 and Task 2, DeepSeek, Doubao via Volcengine Ark and other compatible APIs. Use your own API key; no shared quota is included. Academic Task 1 requires chart/process/map information as text, not an image upload.
+
+A local IELTS Writing Task 1 / Task 2 practice app that turns essay feedback into reusable learning cards. Compare your draft, a minimally corrected version, and an independently generated model essay, then practise the language you want to retain.
 
 The learning interface and feedback explanations are in Simplified Chinese; essays and practice sentences are in English. **AI band estimates are learning feedback, not official IELTS results or a promise of improvement.** This project is not affiliated with IELTS.
 
@@ -23,7 +25,9 @@ Click a highlight to see the source, revision, explanation and a short exercise.
 
 ### Windows one-click installer (recommended)
 
-Download the [Jujin v0.1.2 Windows x64 installer](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.1.2/ielts-writing-studio-v0.1.2-windows-x64-setup.exe). It includes Node.js and a Chinese setup wizard and needs no administrator permission.
+Download the [Jujin v0.2.0 Windows x64 installer](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.2.0/ielts-writing-studio-v0.2.0-windows-x64-setup.exe). It includes Node.js and a Chinese setup wizard and needs no administrator permission.
+
+Older versions require this manual upgrade once. From v0.2.0 onward, the Windows x64 installer edition has **检查更新** at the bottom of the page: check, download, verify SHA-256, install and restart. Updates are user initiated. External AI settings/models and browser records at the same origin/port are retained. Portable/source/Mac editions link to manual downloads.
 
 The first-run page offers a choice between online and local AI. It does not start a model download automatically. Clicking **一键准备本地 AI** explicitly starts Ollama download and verification, then prepares the recommended `qwen3.5:4b` model (approximately 3.4 GB). The Ollama runtime needs additional download and storage space; the setup page reports total requirements. Progress, retry and cancellation are available.
 
@@ -33,7 +37,11 @@ Existing installations can restore their previously installed model without a fo
 
 ### Windows portable download
 
-Download [ielts-writing-studio-v0.1.2-windows-x64.zip](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.1.2/ielts-writing-studio-v0.1.2-windows-x64.zip), extract the entire archive, then double-click `Start Portable.cmd`. The Windows x64 package includes Node.js, so no separate Node installation is needed. **AI models are not bundled:** the labelled example is available immediately; real analysis requires the first-run local AI setup or another provider configured below.
+Download [ielts-writing-studio-v0.2.0-windows-x64.zip](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.2.0/ielts-writing-studio-v0.2.0-windows-x64.zip), extract the entire archive, then double-click `Start Portable.cmd`. Node.js is included; AI models are not.
+
+### Mac download
+
+Select macos-arm64 (Apple Silicon) or macos-x64 (Intel) on the release page. Extract fully and double-click `Start Writing Studio.command`; keep the terminal open. Node.js is included. Online AI is recommended; automatic local model preparation is Windows-only. Mac packages are unsigned and unnotarized; macOS may require confirmation in system security settings. CI covers the launcher and HTTP service, not real-user Gatekeeper/Safari or Mac AI inference.
 
 ### Run from source (Windows, macOS or Linux)
 
@@ -107,7 +115,7 @@ The optional **Codex CLI** choice uses your own installed, authenticated CLI and
 - Correction and model-essay generation use separate requests; independent model generation never receives the student's draft. Core essay text and all four scoring dimensions must pass integrity checks. Non-core highlights with unverifiable quotes are omitted with a visible notice, while malformed core results trigger a bounded retry or error. Failures never silently substitute demo feedback and retain the draft and previous completed analysis.
 - Web settings are stored in the current user's application configuration directory, including `%LOCALAPPDATA%\JujinWritingStudio\settings\cloud-ai.json` on Windows. This file is not encrypted; keep it private and avoid saving a personal key on a shared computer. Saved keys are not returned to the page or stored in browser exercise history. Removing the saved connection deletes that configuration without changing exercises; `.env` credentials must be removed from `.env` separately.
 - Keys, local logs and live test results are ignored by Git. Never put credentials in `public/`.
-- The app covers Task 2 only. It does not include Task 1, cloud sync, accounts, a project-hosted inference service, or validated prediction of official bands. GitHub Releases distributes code and installers; it does not host the Node backend.
+- The current source supports Task 1 and Task 2. Academic Task 1 requires text source material; direct image input is not supported. It does not include cloud sync, accounts, a project-hosted inference service, or validated prediction of official bands. GitHub Releases distributes code and installers; it does not host the Node backend.
 
 See [Security](SECURITY.md), [third-party boundaries](THIRD_PARTY_NOTICES.md) and [v0.1.2 verification](docs/release-verification-v0.1.2.md).
 

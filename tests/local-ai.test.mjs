@@ -52,6 +52,7 @@ async function fixture(t, extra = {}) {
   const manager = createLocalAIManager({
     rootDir: root, platform: 'win32', arch: 'x64', memoryBytes: 16 * 1024 ** 3,
     model: 'qwen2.5:3b', fetch, spawn, expectedSha256,
+    diskFreeBytes: async () => 100 * 1024 ** 3,
     downloadArchive: async ({ destination, signal, onProgress }) => {
       if (signal.aborted) throw Object.assign(new Error('cancelled'), { code: 'CANCELLED' });
       await fs.mkdir(path.dirname(destination), { recursive: true });
@@ -237,6 +238,21 @@ test('已就绪进程崩溃后清除ready，恢复会重启而不重新下载', 
   assert.equal(f.state.spawned.length, 2);
   assert.equal(f.state.pulls, 1, '崩溃恢复不能重复下载已经存在的模型');
   await f.manager.close();
+});
+
+test('关闭自己启动的 Windows 引擎时结束整棵进程树，避免推理进程残留',async t=>{
+  const commands=[];
+  const f=await fixture(t,{execFile:async(...args)=>{commands.push(args);return {stdout:''};}});
+  f.manager.start();
+  for(let i=0;i<100 && (await f.manager.getStatus()).busy;i++)await new Promise(r=>setTimeout(r,5));
+  assert.equal((await f.manager.getStatus()).phase,'ready');
+  f.state.spawned[0].pid=987654;
+  await f.manager.close();
+  assert.equal(commands.length,1);
+  assert.equal(commands[0][0],'taskkill.exe');
+  assert.deepEqual(commands[0][1],['/PID','987654','/T','/F']);
+  assert.equal(commands[0][2].windowsHide,true);
+  await f.manager.close();assert.equal(commands.length,1,'重复关闭不能杀死其他进程');
 });
 
 test('新安装只推荐验证过的4B，低于12GiB内存不下载', async t => {

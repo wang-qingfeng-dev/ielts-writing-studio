@@ -1,10 +1,12 @@
 # 句进 · 雅思写作工作台
 
-[English](README.en.md) · [下载 v0.1.2](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.1.2) · [更新记录](CHANGELOG.md)
+> v0.2.0：新增 Task 1 小作文、国产在线 AI 引导、Windows 在线更新，以及 Apple Silicon / Intel 两种 Mac 包。请阅读[使用说明](docs/task1-online-preview.md)和[更新说明](docs/release-notes-v0.2.0.md)。
 
-**v0.1.2** 新增网页在线 AI 设置，改进本地模型输出校验与恢复，并支持按需准备 Qwen3.5:4b。低配置电脑可选择在线 AI，无需下载本地模型。
+[English](README.en.md) · [下载 v0.2.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.2.0) · [更新记录](CHANGELOG.md)
 
-一个面向中文学习者的 IELTS Writing Task 2 本机学习工具。通过「我的原文 → 保留原意的精修 → 独立范文」三栏对照，把批改转化成可以复习、造句和迁移的学习卡片。
+**v0.2.0** 支持 Task 1 学术类与培训类、Task 2，以及 DeepSeek、豆包（火山方舟）等在线接口。首次配置自己的 API 密钥，以后直接在应用内批改；不提供共享额度。
+
+一个面向中文学习者的 IELTS Writing Task 1 / Task 2 本机学习工具。通过「我的原文 → 保留原意的精修 → 独立范文」三栏对照，把批改转化成可以复习、造句和迁移的学习卡片。
 
 **四项分数是 AI 练习估分，不是雅思官方成绩；不承诺提分，也不代表官方背书。**
 
@@ -14,8 +16,8 @@
 
 - 粘贴完整题目和英文作文，设置目标分数，查看字数。
 - 原文与精修联动高亮：原句、修改、中文解释、同类练习。
-- 分别查看 TR 任务回应、CC 连贯与衔接、LR 词汇资源、GRA 语法四项估分、证据和改进动作。
-- 独立范文只接收题目与目标分，不接收你的作文；真实练习默认折叠范文。
+- 分别查看 TA 任务完成度（Task 1）或 TR 任务回应（Task 2），以及 CC 连贯与衔接、LR 词汇资源、GRA 语法四项估分、证据和改进动作。
+- 独立范文接收题型、题目、目标分和必要的原图文字材料，不接收你的作文；真实练习默认折叠范文。
 - 每篇优先解决三个问题，并整理错误、搭配、好句与论证方法。
 - 收藏后按 1、3、7、14、30 天复习，保存最多 30 篇练习，导出 Markdown 学习笔记。
 - 右上角选择「自动 / Ollama 本地 / 在线 AI / Codex CLI」，分析或连接测试中禁止切换。
@@ -26,7 +28,7 @@
 
 ### Windows：下载便携版
 
-1. 下载 [句进 v0.1.2 Windows x64 便携版 ZIP](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.1.2/ielts-writing-studio-v0.1.2-windows-x64.zip)。
+1. 下载 [句进 v0.2.0 Windows x64 便携版 ZIP](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.2.0/ielts-writing-studio-v0.2.0-windows-x64.zip)。
 2. **先完整解压**到一个文件夹，不要在压缩包里直接运行。
 3. 双击解压目录中的 `Start Portable.cmd`，打开本机网页。
 
@@ -34,7 +36,9 @@
 
 ### Windows：小白一键安装（推荐）
 
-下载 [句进 v0.1.2 一键安装程序](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.1.2/ielts-writing-studio-v0.1.2-windows-x64-setup.exe)，双击后按中文向导完成安装。安装程序自带 Node.js，不需要打开命令行。
+下载 [句进 v0.2.0 一键安装程序](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.2.0/ielts-writing-studio-v0.2.0-windows-x64-setup.exe)，双击后按中文向导完成安装。安装程序自带 Node.js，不需要打开命令行。
+
+**升级：** v0.1.2 及更早版本没有更新入口，请先关闭旧版并运行这次安装程序，安装到原目录。从 v0.2.0 起，Windows x64 安装版可在页面底部点“检查更新”→“下载、安装并重启”。只在用户点击后联网和下载，校验 SHA-256 后安装；保留同一浏览器、地址和端口的学习记录，以及外部 AI 配置与模型。便携版、源码和 Mac 请下载新包。重要笔记建议先导出。
 
 首次启动先提供在线与本地两种选择，不会自动下载模型。只有点击「一键准备本地 AI」，才会下载并校验 Ollama、准备推荐模型 `qwen3.5:4b`（模型约 3.4 GB）并显示进度。Ollama 运行时另需下载和存储空间，完整准备所需空间以页面提示为准；完成后可以离线使用。
 
@@ -49,9 +53,15 @@
 3. 确认题目与作文发送、账户额度说明，点击「连接并使用」。程序先发送一条不含作文的测试请求，成功后才保存并切换服务。
 4. 回到写作区点击「开始分析」。以后启动会恢复已保存的配置；可在「管理在线 AI」中修改或删除连接。
 
-预设提供 DeepSeek、硅基流动、OpenRouter，以及自定义兼容接口。DeepSeek 按用量收费；硅基流动的模型和免费额度以控制台为准；OpenRouter 免费模型需要自己的密钥，并受次数、频率、可用性和输出质量限制。软件不提供共享密钥或无限免费额度。
+预设提供 DeepSeek、豆包（火山方舟）、腾讯混元（已有云账户）、硅基流动、OpenRouter，以及自定义兼容接口。聊天网站登录或会员不能代替 API 授权；腾讯混元不是元宝聊天账号接入。各平台费用和免费额度以其控制台为准，软件不提供共享密钥或无限免费额度。
 
 在线批改不依赖本机运行大模型，但仍需要网络和服务商可用额度。连接测试只验证接口能返回基本格式，不保证每篇批改都会成功。自定义接口只接受 HTTPS；本机 localhost、127.0.0.1、::1 可使用 HTTP，并可按服务要求留空密钥。
+
+### Mac 下载（Apple Silicon / Intel）
+
+从 [v0.2.0 发行页](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.2.0) 选择 `macos-arm64.zip`（M 系列芯片）或 `macos-x64.zip`（Intel）。完整解压后双击 `Start Writing Studio.command`，保留终端窗口；已附 Node.js，建议使用在线 AI。Mac 不支持自动准备本地模型。
+
+包未签名或公证，macOS 可能要求在系统安全设置中确认打开。自动验证覆盖 macOS 启动和 HTTP，不等于用户真机、Safari 或 Gatekeeper 全覆盖。详见 [Mac 使用说明](scripts/macos/README.macos.zh-CN.md)。
 
 ### 从源码运行（Windows / macOS / Linux）
 
@@ -99,7 +109,7 @@ Codex 模式需要你自己安装、登录 CLI，使用你自己的账号额度�
 
 网页设置中的密钥保存在当前用户的应用配置目录；Windows 路径为 `%LOCALAPPDATA%\JujinWritingStudio\settings\cloud-ai.json`。此文件不加密，不写入浏览器练习记录或项目仓库，请勿分享配置文件或在共享电脑上保存自己的密钥。页面不会回传已保存的密钥。删除已保存连接会删除该配置文件，作文记录继续保留；通过 `.env` 配置的凭据需自行从 `.env` 移除。
 
-当前版本只支持 Task 2；不包含云同步、多人账号、Task 1 或软件提供的公共推理服务。公开源码和 GitHub Release 不等于部署了可直接在线批改的网站。当前服务器只监听本机地址，请勿直接当成公网多人服务部署。
+当前源码支持 Task 1 / Task 2；学术类 Task 1 需输入原图文字材料，暂不直接读取图片。不包含云同步、多人账号或软件提供的公共推理服务。公开源码和 GitHub Release 不等于部署了可直接在线批改的网站。当前服务器只监听本机地址，请勿直接当成公网多人服务部署。
 
 ## 测试与贡献
 

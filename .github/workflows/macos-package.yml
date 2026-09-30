@@ -1,0 +1,37 @@
+name: macOS packages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            arch: arm64
+          - os: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+      - name: Verify architecture
+        run: node -e "if(process.arch!=='${{ matrix.arch }}')process.exit(1)"
+      - name: Test
+        run: node --test --test-concurrency=1 tests/*.test.mjs
+      - name: Build with verified official Node runtime
+        run: node scripts/macos/build-macos.mjs
+      - name: Test extracted download and launcher
+        run: node scripts/macos/smoke-macos.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}
+          path: release-artifacts/*
+          if-no-files-found: error
+          retention-days: 14

@@ -138,7 +138,7 @@ test('rejects directory traversal and source-file access', async t => {
 test('limits raw body size before model invocation', async t => {
   let called = false;
   const base = await withServer(t, { analyze: async () => { called = true; return fixture(); } });
-  const response = await post(base, { ...input, essay: 'x'.repeat(70000) }); assert.equal(response.status, 413); assert.equal(called, false);
+  const response = await post(base, { ...input, essay: 'x'.repeat(140000) }); assert.equal(response.status, 413); assert.equal(called, false);
   assert.equal((await post(base)).status, 200, 'server must release busy flag after rejected request');
 });
 test('serializes requests and releases busy state after completion', async t => {

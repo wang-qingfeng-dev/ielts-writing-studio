@@ -4,6 +4,8 @@ import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { DEMO_PROMPT, DEMO_ESSAY, DEMO_ANALYSIS } from '../public/demo.js';
 import { countWords } from '../public/utils.js';
+import { taskProfile } from '../public/writing-task.js';
+import { academicInput } from './task1-fixtures.mjs';
 
 // 在简化的 DOM/网络边界中执行正式状态转换。
 // 这里直接读取 app.js，避免重复实现持久化逻辑。
@@ -44,7 +46,7 @@ function harness(overrides = {}) {
     practiceAnswers: new Map(),
     KEYS: { draft: 'draft', history: 'history' },
     DEMO_PROMPT, DEMO_ESSAY, DEMO_ANALYSIS,
-    countWords, structuredClone, AbortController, AbortSignal,
+    countWords, taskProfile, structuredClone, AbortController, AbortSignal,
     Date: { now: () => now },
     crypto: { randomUUID: () => `new-practice-${++nextId}` },
     setTimeout: () => 1,
@@ -307,4 +309,27 @@ test('interrupted provider changes recheck server selection before unlocking con
   assert.equal(h.context.$('#provider-select').value, 'codex');
   assert.equal(h.context.$('#provider-select').disabled, false);
   assert.equal(h.context.providerSwitching, false);
+});
+
+test('Task 1 draft, history and request keep the original chart material',async()=>{
+  const h=harness({...academicInput,analysis:null});
+  h.run('saveDraft();saveHistory();');
+  assert.equal(h.saved.get('draft').taskData,academicInput.taskData);
+  assert.equal(h.saved.get('history')[0].taskType,'task1-academic');
+  const pending=h.run('analyze()');
+  const body=JSON.parse(h.pending().options.body);
+  assert.equal(body.taskType,'task1-academic');assert.equal(body.taskData,academicInput.taskData);
+  h.context.controller.abort();await pending;
+  assert.equal(h.context.state.taskData,academicInput.taskData);
+  h.run('freshExercise()');
+  assert.equal(h.context.state.taskType,'task1-academic');assert.equal(h.context.state.taskData,'');
+  h.run('freshExercise(true)');assert.equal(h.context.state.taskType,'task2');
+});
+
+test('missing chart data blocks analysis without changing the existing draft',async()=>{
+  const h=harness({...academicInput,taskData:'',analysis:null});
+  let calls=0;h.context.fetch=()=>{calls++;};
+  await h.run('analyze()');
+  assert.equal(calls,0);assert.equal(h.context.state.essay,academicInput.essay);
+  assert(h.messages.some(x=>x.includes('原图')));
 });

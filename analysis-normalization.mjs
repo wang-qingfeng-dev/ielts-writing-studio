@@ -1,4 +1,4 @@
-import { validateCorrection, validateModel, ValidationError } from './analysis-schema.mjs';
+import { validateCorrection, validateModel, validateTaskScores, ValidationError } from './analysis-schema.mjs';
 
 /**
  * 对模型的格式偏差做有限、可审计的修复，不替模型生成评分或教学内容。
@@ -14,6 +14,7 @@ import { validateCorrection, validateModel, ValidationError } from './analysis-s
 const CRITERION_ORDER = ['TR', 'CC', 'LR', 'GRA'];
 const CRITERION_NAMES = new Map([
   ['tr', 'TR'], ['task response', 'TR'], ['任务回应', 'TR'],
+  ['ta', 'TA'], ['task achievement', 'TA'], ['任务完成情况', 'TA'], ['任务完成度', 'TA'],
   ['cc', 'CC'], ['coherence and cohesion', 'CC'], ['连贯与衔接', 'CC'],
   ['lr', 'LR'], ['lexical resource', 'LR'], ['词汇资源', 'LR'],
   ['gra', 'GRA'], ['grammatical range and accuracy', 'GRA'], ['grammar range and accuracy', 'GRA'], ['语法多样性与准确性', 'GRA'],
@@ -67,10 +68,11 @@ function normalizeScore(score, path, warnings) {
   }
   // 只在四项完全且互不重复时排序，绝不补全缺失维度或消除重复评分。
   const keys = score.criteria.map(item => item?.key);
-  if (keys.length === 4 && new Set(keys).size === 4 && keys.every(key => CRITERION_ORDER.includes(key))) {
-    if (keys.some((key, index) => key !== CRITERION_ORDER[index])) {
-      score.criteria.sort((left, right) => CRITERION_ORDER.indexOf(left.key) - CRITERION_ORDER.indexOf(right.key));
-      warn(warnings, 'criterion_order_normalized', `${path}.criteria`, '评分维度已按 TR、CC、LR、GRA 排序。');
+  const order = keys.includes('TA') ? ['TA', 'CC', 'LR', 'GRA'] : CRITERION_ORDER;
+  if (keys.length === 4 && new Set(keys).size === 4 && keys.every(key => order.includes(key))) {
+    if (keys.some((key, index) => key !== order[index])) {
+      score.criteria.sort((left, right) => order.indexOf(left.key) - order.indexOf(right.key));
+      warn(warnings, 'criterion_order_normalized', `${path}.criteria`, '评分维度已按题型标准排序。');
     }
   }
   return score;
@@ -172,13 +174,14 @@ function normalizeExpressions(items, { source, text, validate }, warnings) {
   }, warnings);
 }
 
-export function normalizeCorrection(raw, essay) {
+export function normalizeCorrection(raw, essay, taskType = 'task2') {
   if (!isObject(raw)) { validateCorrection(raw, essay); }
   const data = structuredClone(raw), warnings = [];
   normalizeScore(data.originalScore, 'originalScore', warnings);
   if (isObject(data.corrected)) normalizeScore(data.corrected.score, 'corrected.score', warnings);
   const core = { ...data, issues: [], expressions: [] };
   validateCorrection(core, essay);
+  validateTaskScores(core, taskType);
   validateScoreLanguage(core.originalScore, 'originalScore');
   validateScoreLanguage(core.corrected.score, 'corrected.score');
   for (const [index, priority] of core.priorities.entries()) {
@@ -206,12 +209,13 @@ export function normalizeCorrection(raw, essay) {
   return { data, warnings };
 }
 
-export function normalizeModel(raw) {
+export function normalizeModel(raw, taskType = 'task2') {
   if (!isObject(raw)) { validateModel(raw); }
   const data = structuredClone(raw), warnings = [];
   if (isObject(data.model)) normalizeScore(data.model.score, 'model.score', warnings);
   const core = { ...data, model: { ...data.model, notes: [] }, expressions: [] };
   validateModel(core);
+  validateTaskScores(core, taskType);
   validateScoreLanguage(core.model.score, 'model.score');
   data.model.notes = normalizeItems(data.model.notes, {
     path: 'model.notes', limit: 8,

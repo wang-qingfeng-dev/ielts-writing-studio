@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#214d3e">
-  <meta name="description" content="雅思 Task 2 写作工作台：原文诊断、最小修改、独立范文，以及真正能用起来的复习卡片。">
+  <meta name="description" content="雅思 Task 1 / Task 2 写作工作台：原文诊断、最小修改、独立范文，以及真正能用起来的复习卡片。">
   <title>句进 · 雅思写作工作台</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="/styles.css">
@@ -33,8 +33,14 @@
     </section>
     <section class="prompt-card" aria-labelledby="prompt-label">
       <div class="prompt-topline"><label for="prompt-input" class="section-kicker" id="prompt-label"><span data-icon="file"></span>本次写作题目 <span class="muted">THE QUESTION</span></label><button class="btn btn-ghost btn-small" data-action="demo"><span data-icon="spark"></span>体验完整示例</button></div>
-      <textarea id="prompt-input" class="prompt-textarea" rows="3" maxlength="5000" placeholder="在这里粘贴完整的 IELTS Writing Task 2 题目，包括最后的提问要求……" spellcheck="false" aria-describedby="prompt-guidance"></textarea>
-      <div class="prompt-footer"><div class="prompt-options"><span class="task-badge">Academic / General · Task 2</span><label class="target-control" for="target-band">目标分数<select id="target-band"><option value="6">Band 6.0</option><option value="6.5">Band 6.5</option><option value="7" selected>Band 7.0</option><option value="7.5">Band 7.5</option><option value="8">Band 8.0</option><option value="8.5">Band 8.5</option></select></label></div><span class="prompt-hint" id="prompt-guidance">建议 40 分钟 · 至少 250 词</span></div>
+      <textarea id="prompt-input" class="prompt-textarea" rows="3" maxlength="5000" placeholder="在这里粘贴完整题目：Task 1 图表说明/书信要点，或 Task 2 作文要求……" spellcheck="false" aria-describedby="prompt-guidance"></textarea>
+      <div class="prompt-footer"><div class="prompt-options"><label class="target-control" for="task-type">写作题型<select id="task-type"><option value="task2">Task 2 · 大作文</option><option value="task1-academic">Task 1 · 学术类图表</option><option value="task1-general">Task 1 · 培训类书信</option></select></label><label class="target-control" for="target-band">目标分数<select id="target-band"><option value="6">Band 6.0</option><option value="6.5">Band 6.5</option><option value="7" selected>Band 7.0</option><option value="7.5">Band 7.5</option><option value="8">Band 8.0</option><option value="8.5">Band 8.5</option></select></label></div><span class="prompt-hint" id="prompt-guidance">建议 40 分钟 · 至少 250 词</span></div>
+      <p id="task-guidance" class="cloud-ai-hint"></p>
+      <div id="task-data-section" class="hidden">
+        <label for="task-data">图表原始信息 / 流程 / 地图描述</label>
+        <p id="task-data-help" class="cloud-ai-hint">请从原图填写标题、单位、时间、分类及数值；流程题填写阶段，地图题填写位置和变化。目前使用文字材料，不能直接读取图片。不要复制自己的作文代替原图信息。</p>
+        <textarea id="task-data" class="prompt-textarea" rows="5" maxlength="10000" aria-describedby="task-data-help" placeholder="例如：柱状图，某城市通勤方式占比（%）。2000 年：汽车 40、公交 35、骑行 25；2020 年：汽车 55、公交 30、骑行 15。请填写你题目中的真实信息。"></textarea>
+      </div>
     </section>
     <div id="notice" class="notice-banner hidden" role="status"></div>
     <div id="analysis-warning" class="notice-banner hidden" role="status"></div>
@@ -93,17 +99,24 @@
       <div class="section-heading"><div><p class="eyebrow">MAKE IT YOURS</p><h2 id="review-heading">读懂了，还要用得出来。</h2><p class="section-description">把这次的错误和好表达，带到下一道题里。</p></div><div class="section-actions"><button class="btn btn-secondary btn-small" data-action="export" id="export-button" disabled><span data-icon="download"></span>导出学习笔记</button></div></div>
       <div class="review-grid"><section class="review-column"><div class="review-column-heading"><h3><span data-icon="target"></span>我的易错点</h3><span class="review-count" id="errors-total">00</span></div><div id="review-errors"></div></section><section class="review-column"><div class="review-column-heading"><h3><span data-icon="link"></span>实用搭配</h3><span class="review-count" id="phrases-total">00</span></div><div id="review-phrases"></div></section><section class="review-column"><div class="review-column-heading"><h3><span data-icon="lightbulb"></span>好句与论证</h3><span class="review-count" id="notes-total">00</span></div><div id="review-notes"></div></section></div>
     </section>
-    <footer class="page-footer"><span>句进 · 一句一句，向前一步。 · v0.1.2</span><button class="text-button" data-action="about">评分说明与使用方法 <span aria-hidden="true">↗</span></button></footer>
+    <footer class="page-footer"><span>句进 · 一句一句，向前一步。 · v0.2.0</span><button class="text-button" id="update-check">检查更新</button><button class="text-button" data-action="about">评分说明与使用方法 <span aria-hidden="true">↗</span></button></footer>
   </main>
+  <dialog class="cloud-ai-dialog" id="update-dialog" aria-labelledby="update-title">
+    <div class="modal-header"><h2 id="update-title">软件更新</h2><button class="icon-btn" id="update-close" aria-label="关闭软件更新">✕</button></div>
+    <div class="modal-body"><p id="update-message" role="status" aria-live="polite"></p><p>更新会保留本机 AI 设置和同一浏览器中的学习记录。重要笔记建议先导出备份。</p><p><a href="https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/latest" target="_blank" rel="noopener noreferrer">打开官方发行页 ↗</a></p></div>
+    <div class="modal-footer"><button class="btn btn-primary" id="update-install" hidden>下载、安装并重启</button></div>
+  </dialog>
   <dialog class="cloud-ai-dialog" id="cloud-ai-dialog" aria-labelledby="cloud-dialog-title" aria-describedby="cloud-dialog-description">
     <form id="cloud-ai-form">
       <div class="modal-header"><h2 id="cloud-dialog-title">设置在线 AI</h2><button type="button" class="icon-btn" id="cloud-ai-close" aria-label="关闭在线 AI 设置">✕</button></div>
       <div class="modal-body">
-        <p id="cloud-dialog-description">不需要安装大模型。首次在服务商网站创建一个 API 密钥，之后就能直接在这里批改。</p>
+        <p id="cloud-dialog-description">首次连接一次，以后直接在这里批改。无需下载大模型，也不用来回复制作文。</p>
         <fieldset id="cloud-ai-fields" class="cloud-ai-fields">
           <label for="cloud-provider">1. 选择服务商</label><select id="cloud-provider" name="provider" required></select>
           <p id="cloud-provider-pricing" class="cloud-ai-hint"></p>
-          <p><a id="cloud-provider-signup" href="#" target="_blank" rel="noopener noreferrer">打开服务商网站，获取 API 密钥 ↗</a></p>
+          <p id="cloud-provider-steps" class="cloud-ai-hint"></p>
+          <p><a class="btn btn-secondary" id="cloud-provider-signup" href="#" target="_blank" rel="noopener noreferrer">登录官方平台 · 获取密钥 ↗</a></p>
+          <p class="cloud-ai-hint">官方页面在新标签中打开，本窗口和作文会保留。聊天网站登录或会员不能直接授权本站，需使用服务商的 API 密钥；不要填写聊天账户密码。</p>
           <label for="cloud-api-key">2. 粘贴 API 密钥</label><input id="cloud-api-key" name="apiKey" type="password" autocomplete="off" spellcheck="false" autocapitalize="off" maxlength="4096" placeholder="粘贴服务商提供的 API Key" aria-describedby="cloud-key-help">
           <p id="cloud-key-help" class="cloud-ai-hint">密钥保存在这台电脑的应用配置中，不写入作文记录或 GitHub。不要在共享电脑上保存自己的密钥。</p>
           <details id="cloud-advanced"><summary>模型与接口地址</summary><div class="cloud-advanced-fields"><label for="cloud-model">模型名称</label><input id="cloud-model" name="model" type="text" maxlength="200" autocomplete="off" required><label for="cloud-base-url">API 地址</label><input id="cloud-base-url" name="baseUrl" type="url" maxlength="500" autocomplete="off" required aria-describedby="cloud-base-help"><p id="cloud-base-help" class="cloud-ai-hint">预设服务无需修改。自定义服务请填写兼容接口的基础地址，通常以 /v1 结尾。</p></div></details>

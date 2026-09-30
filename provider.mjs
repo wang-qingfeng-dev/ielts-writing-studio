@@ -153,7 +153,7 @@ export async function completeJson(provider, { system, prompt, schema, signal, m
     const base={model:provider.model,messages:[{role:'system',content:instructions},{role:'user',content:prompt}],temperature:0.2,max_tokens:maxTokens};
     // DeepSeek 现行 API 默认思考模式开启，短连接测试会耗尽预算而没有正文。
     // 只向官方主机传其专用参数，不影响其他兼容服务。
-    if (new URL(provider.url).hostname === 'api.deepseek.com') base.thinking = { type:'disabled' };
+    if (['api.deepseek.com', 'ark.cn-beijing.volces.com'].includes(new URL(provider.url).hostname)) base.thinking = { type:'disabled' };
     if (new URL(provider.url).hostname === 'openrouter.ai') base.reasoning = { enabled:false };
     const headers={'Content-Type':'application/json'};
     // 凭据只可发送至它绑定的地址，不能让另一个兼容接口继承当前密钥。

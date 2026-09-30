@@ -1,7 +1,7 @@
 ; 句进雅思写作工作台的 Inno Setup 安装脚本。
 ; SourceDir、OutputDir 和 AppVersion 由 build-windows-installer.ps1 通过 /D 参数传入。
 #ifndef AppVersion
-  #define AppVersion "v0.1.2"
+  #define AppVersion "v0.2.0"
 #endif
 #ifndef SourceDir
   #define SourceDir "."

@@ -413,7 +413,13 @@ export function createLocalAIManager(options = {}) {
     disposed = true;
     if (operation) operation.controller.abort();
     if (ownedProcess && !ownedProcess.killed) {
-      try { ownedProcess.kill(); } catch {}
+      // Windows 只 kill 主进程会留下推理子进程，重复启动后持续占用内存/显存。
+      // 仅处理本管理器创建且仍存活的进程树，不按进程名称全局结束其他应用。
+      const child = ownedProcess;
+      if (platform === 'win32' && child.pid && child.exitCode == null) {
+        try { await deps.execFile('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], {windowsHide:true,timeout:10000}); }
+        catch { try { child.kill(); } catch {} }
+      } else { try { child.kill(); } catch {} }
     }
     ownedProcess = null;
     return snapshot();

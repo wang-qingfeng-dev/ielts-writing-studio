@@ -22,6 +22,24 @@ export const modelSchema = object({
   expressions: array(expressionSchema)
 });
 
+// 为 Task 1 生成 TA schema，保持已有 Task 2 / 历史记录的 TR 契约。
+export function schemasForTask(taskType = 'task2') {
+  const schemas = structuredClone({ correction: correctionSchema, model: modelSchema, score: scoreSchema });
+  if (taskType !== 'task2') {
+    for (const score of [schemas.correction.properties.originalScore, schemas.correction.properties.corrected.properties.score, schemas.model.properties.model.properties.score, schemas.score]) {
+      score.properties.criteria.items.properties.key.enum = ['TA', 'CC', 'LR', 'GRA'];
+    }
+  }
+  return schemas;
+}
+
+export function validateTaskScores(result, taskType = 'task2') {
+  const expected = taskType === 'task2' ? 'TR' : 'TA';
+  const scores = [result.originalScore, result.corrected?.score, result.model?.score].filter(Boolean);
+  for (const score of scores) assert(score.criteria.some(item => item.key === expected), `This task requires ${expected}, CC, LR, GRA scoring.`);
+  return result;
+}
+
 export class ValidationError extends Error {}
 const assert = (condition, message) => { if (!condition) throw new ValidationError(message); };
 function text(value, name, max = 12000) {
@@ -38,11 +56,12 @@ export function validateScore(score) {
   assert(Array.isArray(score.criteria) && score.criteria.length === 4, 'Exactly four score criteria required');
   const keys = new Set();
   for (const criterion of score.criteria) {
-    assert(criterion && ['TR', 'CC', 'LR', 'GRA'].includes(criterion.key) && !keys.has(criterion.key), 'Invalid or duplicate criterion');
+    assert(criterion && ['TA', 'TR', 'CC', 'LR', 'GRA'].includes(criterion.key) && !keys.has(criterion.key), 'Invalid or duplicate criterion');
     keys.add(criterion.key);
     assert(band(criterion.band), 'Invalid criterion band');
     text(criterion.evidence, 'evidence', 2000); text(criterion.action, 'action', 2000);
   }
+  assert(['CC', 'LR', 'GRA'].every(key => keys.has(key)) && (keys.has('TA') !== keys.has('TR')), 'Exactly one task criterion and CC, LR, GRA required');
 }
 function validateExpressions(expressions, source, sourceText, maximum) {
   assert(Array.isArray(expressions) && expressions.length <= maximum, 'Too many expressions');
@@ -101,5 +120,13 @@ export function validateRequest(body) {
   assert(typeof body.prompt === 'string' && body.prompt.trim().length >= 10 && body.prompt.length <= 5000, '题目需要 10–5000 个字符。');
   assert(typeof body.essay === 'string' && body.essay.trim().length >= 30 && body.essay.length <= 16000, '作文需要 30–16000 个字符。');
   assert(typeof body.targetBand === 'number' && body.targetBand >= 4 && body.targetBand <= 9 && Number.isInteger(body.targetBand * 2), '目标分数应为 4–9 分，每 0.5 分一档。');
-  return { prompt: body.prompt.trim(), essay: body.essay.trim(), targetBand: body.targetBand };
+  const taskType = body.taskType ?? 'task2';
+  assert(['task2', 'task1-academic', 'task1-general'].includes(taskType), '请选择有效的 Task 1 / Task 2 题型。');
+  assert(body.taskData === undefined || (typeof body.taskData === 'string' && body.taskData.length <= 10000), '图表描述最多 10000 个字符。');
+  const taskData = body.taskData?.trim() || '';
+  if (taskType === 'task1-academic') assert(taskData.length >= 20, '请补充图表数据、单位与年份，或流程/地图描述（至少 20 字符）。内置批改不会读取题目图片，也不会从作文猜测图表。');
+  const request = { prompt: body.prompt.trim(), essay: body.essay.trim(), targetBand: body.targetBand };
+  // 无新字段的旧请求保持兼容。
+  if (body.taskType !== undefined || body.taskData !== undefined) Object.assign(request, { taskType, taskData: taskType === 'task1-academic' ? taskData : '' });
+  return request;
 }

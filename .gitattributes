@@ -1,0 +1,2 @@
+# Mac 启动器必须使用 Unix 换行，ZIP 构建器负责设置执行权限。
+*.command text eol=lf

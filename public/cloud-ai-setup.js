@@ -61,13 +61,15 @@ export function initCloudAiSetup(options = {}) {
     baseInput.value = useSaved ? config.baseUrl || '' : preset?.baseUrl || '';
     modelInput.value = useSaved ? config.model || '' : preset?.model || '';
     baseInput.readOnly = !custom;
-    byId('cloud-advanced').open = custom;
+    byId('cloud-advanced').open = custom || !modelInput.value;
+    byId('cloud-provider-steps').textContent = preset?.setupHint || '点击下方按钮登录官方平台 → 创建并复制 API 密钥 → 回到本窗口粘贴 → 点击“连接并使用”。只需首次设置，以后直接在写作页面分析。';
     byId('cloud-provider-pricing').textContent = preset?.pricingNote || '费用、额度与可用模型由你选择的服务商决定。软件不提供共享 API 密钥或无限免费额度。';
     const link = byId('cloud-provider-signup');
     let signupUrl = null;
     try { const url = new URL(preset?.signupUrl); if (url.protocol === 'https:') signupUrl = url.href; } catch { /* 自定义服务不提供注册链接。 */ }
     link.classList.toggle('hidden', !signupUrl);
     link.href = signupUrl || '#';
+    link.textContent = signupUrl ? `登录 ${preset.label} · 获取密钥 ↗` : '请使用你信任的服务商控制台';
     keyInput.value = '';
     consentInput.checked = false;
     updateKeyHint();

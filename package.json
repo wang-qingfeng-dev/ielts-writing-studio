@@ -1,7 +1,7 @@
 {
   "name": "ielts-writing-studio",
-  "version": "0.1.2",
-  "description": "A local IELTS Task 2 writing studio with linked feedback and spaced review.",
+  "version": "0.2.0",
+  "description": "An IELTS Task 1 and Task 2 writing studio with linked feedback, online AI and spaced review.",
   "license": "MIT",
   "repository": { "type": "git", "url": "https://github.com/wang-qingfeng-dev/ielts-writing-studio.git" },
   "private": true,

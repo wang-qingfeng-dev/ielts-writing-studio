@@ -16,7 +16,7 @@ test('预设填入官方地址与默认模型，硅基流动必须填写账号�
   assert.deepEqual(validateCloudSettings(config), { provider: 'deepseek', baseUrl: 'https://api.deepseek.com', model: 'deepseek-flash', apiKey: config.apiKey });
   assert.equal(validateCloudSettings({ provider: 'openrouter', apiKey: 'test-key' }).model, 'openrouter/free');
   assert.throws(() => validateCloudSettings({ provider: 'siliconflow', apiKey: 'test-key' }), /模型名称/);
-  assert.equal(CLOUD_PRESETS.length, 4);
+  assert.deepEqual(CLOUD_PRESETS.map(item=>item.id).sort(), ['deepseek','doubao','hunyuan','siliconflow','openrouter','custom'].sort());
 });
 
 test('云端必须 HTTPS，固定预设不能偷偷修改地址，本机兼容接口可免密钥', () => {
@@ -41,6 +41,18 @@ test('只为相同服务保留密钥；更改提供商或地址时绝不复用',
 test('输入校验拒绝非对象、换行密钥和无效模型', () => {
   for (const input of [null, [], 'test', { ...config, apiKey: 'test\nInjected: yes' }, { ...config, model: 'model name' }, { ...config, apiKey: 'x'.repeat(4097) }]) {
     assert.throws(() => validateCloudSettings(input), CloudSettingsError);
+  }
+});
+
+test('豆包和腾讯预设固定官方地址，禁止继承其他服务密钥',()=>{
+  const expected={doubao:'https://ark.cn-beijing.volces.com/api/v3',hunyuan:'https://api.hunyuan.cloud.tencent.com/v1'};
+  const current=validateCloudSettings(config);
+  for(const [provider,baseUrl] of Object.entries(expected)) {
+    const c=validateCloudSettings({provider,apiKey:'synthetic-key'});
+    assert.equal(c.baseUrl,baseUrl);assert(c.model);
+    assert.throws(()=>validateCloudSettings({provider},{current}),/自己的 API 密钥/);
+    assert.throws(()=>validateCloudSettings({provider,baseUrl:'https://other.example',apiKey:'synthetic-key'}),/预设服务商/);
+    assert(!JSON.stringify(publicCloudSettings(c)).includes('synthetic-key'));
   }
 });
 

@@ -273,6 +273,11 @@ h1 > span { color: #7d9170; }
 .prompt-textarea:focus-visible { outline: 2px solid #d9e7d2; outline-offset: 5px; }
 .prompt-footer { display: flex; align-items: center; gap: 14px; margin-top: 12px; padding-top: 11px; border-top: 1px solid #eef0e9; }
 .prompt-options { display: flex; align-items: center; gap: 17px; flex-wrap: wrap; }
+#task-data-section { margin-top: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+#task-data-section > label { font-size: 13px; font-weight: 600; }
+#task-data { width: 100%; min-height: 115px; margin-top: 8px; background: var(--surface); }
+#task-guidance { margin-top: 10px; }
+#cloud-provider-signup { white-space: normal; text-align: center; }
 .task-badge {
   display: inline-flex;
   align-items: center;

@@ -2,16 +2,16 @@
 
 :root {
   color-scheme: light;
-  --paper: #f6f5ef;
+  --paper: #f4f6f5;
   --surface: #ffffff;
-  --ink: #233a31;
-  --text: #3c4741;
-  --muted: #747c70;
-  --line: #e1e5dc;
-  --line-strong: #cdd5ca;
-  --green: #25583f;
-  --green-dark: #1b432f;
-  --green-soft: #edf3e9;
+  --ink: #17261f;
+  --text: #435047;
+  --muted: #7b877e;
+  --line: #e3e9e5;
+  --line-strong: #cbd8d0;
+  --green: #1f674e;
+  --green-dark: #164b39;
+  --green-soft: #edf5f0;
   --yellow: #f4e8c6;
   --yellow-text: #927122;
   --red: #a5534b;
@@ -20,8 +20,8 @@
   --blue-soft: #eaf0f8;
   --purple: #80709a;
   --purple-soft: #f0eaf7;
-  --shadow: 0 3px 12px rgb(39 55 41 / 3%);
-  --radius: 15px;
+  --shadow: 0 8px 28px rgb(31 56 45 / 6%);
+  --radius: 18px;
   --font-ui: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
   --font-essay: Georgia, "Times New Roman", serif;
 }
@@ -878,3 +878,67 @@ h1 > span { color: #7d9170; }
 }
 /* 按钮布局不能覆盖原生 hidden 属性，更新不可用时不显示安装入口。 */
 #update-install[hidden] { display: none !important; }
+
+/* 0.3.0 桌面视觉：把网页式信息堆叠改成轻量的原生工作台层级。 */
+body {
+  background:
+    radial-gradient(circle at 12% -10%, rgb(212 232 220 / 58%), transparent 32rem),
+    radial-gradient(circle at 100% 12%, rgb(228 235 247 / 38%), transparent 30rem),
+    var(--paper);
+}
+.app-header {
+  background: rgb(250 252 251 / 82%);
+  border-bottom-color: rgb(204 218 210 / 72%);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 70%), 0 8px 30px rgb(28 56 43 / 4%);
+}
+.header-inner { height: 78px; }
+.brand { gap: 12px; }
+.brand-mark {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  background: linear-gradient(145deg, #286b51, #164b3a);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 24%), 0 6px 16px rgb(22 75 57 / 18%);
+}
+.brand-mark > svg { width: 31px; height: 31px; }
+.brand-name { font-size: 18px; letter-spacing: -.6px; }
+.brand-tag { color: #829087; font-size: 12px; letter-spacing: 0; }
+.header-actions { gap: 6px; }
+.header-update-button { color: #536c5f; }
+.provider-select { border-radius: 11px; background: rgb(255 255 255 / 86%); }
+.header-actions .btn { border-radius: 11px; }
+.page { padding-top: 40px; }
+.hero { margin-bottom: 29px; }
+.hero .eyebrow { color: #547661; letter-spacing: .7px; }
+h1 { letter-spacing: -1.25px; }
+.hero-copy { color: #718078; }
+.hero-side { padding: 12px 15px; border: 1px solid #e2e9e4; border-radius: 14px; background: rgb(255 255 255 / 60%); box-shadow: 0 5px 18px rgb(31 62 48 / 4%); }
+.prompt-card, .essay-panel, .review-column, .cloud-ai-card, .local-ai-setup {
+  border-color: #dfe8e1;
+  box-shadow: 0 10px 34px rgb(31 62 48 / 5%);
+}
+.prompt-card { border-radius: 20px; }
+.prompt-card:focus-within { border-color: #a9c6b4; box-shadow: 0 12px 40px rgb(31 92 65 / 10%), 0 0 0 4px rgb(170 204 183 / 16%); }
+.prompt-textarea, .essay-textarea, .task-image-preview { border-radius: 12px; }
+.workspace-toolbar { padding: 12px 14px; border: 1px solid #dfe8e1; border-radius: 16px; background: rgb(255 255 255 / 72%); box-shadow: 0 7px 25px rgb(31 62 48 / 4%); }
+.mode-badge { color: #2d604b; background: #eaf4ed; border-color: #d2e6d8; }
+.essay-panel { border-radius: 18px; overflow: hidden; background: rgb(255 255 255 / 92%); transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease; }
+.essay-panel:hover { transform: translateY(-2px); box-shadow: 0 14px 38px rgb(31 62 48 / 9%); border-color: #cbded2; }
+.panel-heading { background: linear-gradient(180deg, rgb(252 254 253 / 96%), rgb(247 250 248 / 72%)); }
+.panel-number { border-radius: 10px; background: #e8f2eb; color: #347058; }
+.panel-subtitle { color: #8a978e; }
+.panel-tabs { border-radius: 9px; }
+.panel-tab.active { box-shadow: 0 2px 8px rgb(30 75 51 / 7%); }
+.review-section { padding-top: 58px; }
+.review-column { border-radius: 18px; background: rgb(255 255 255 / 78%); }
+.page-footer { margin-top: 44px; }
+.btn, .icon-btn, .text-button, .provider-select { transition: background .2s ease, border-color .2s ease, box-shadow .2s ease, color .2s ease, transform .2s ease; }
+.btn:hover:not(:disabled), .icon-btn:hover, .text-button:hover:not(:disabled) { transform: translateY(-1px); }
+.btn-primary { box-shadow: 0 7px 17px rgb(31 103 78 / 15%); }
+.btn-primary:hover:not(:disabled) { box-shadow: 0 10px 22px rgb(31 103 78 / 22%); }
+.toast { border-radius: 13px; box-shadow: 0 12px 32px rgb(25 49 30 / 22%); }
+
+@media (max-width: 999px) {
+  .header-inner { height: 70px; }
+  .header-update-button { display: none; }
+}

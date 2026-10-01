@@ -1,6 +1,6 @@
 {
   "name": "ielts-writing-studio",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "main": "desktop/main.mjs",
   "description": "An IELTS Task 1 and Task 2 writing studio with linked feedback, online AI and spaced review.",
   "license": "MIT",

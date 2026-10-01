@@ -15,12 +15,13 @@
   <header class="app-header">
     <div class="header-inner">
       <a href="/" class="brand" aria-label="句进首页">
-        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M9 8h5v5H9zM18 8h5v5h-5z" fill="currentColor"/><path d="M9 18h5v5H9z" fill="currentColor"/><path d="m19 23 6-10M18 24l4-1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span>
-        <span class="brand-name">句进<span class="brand-tag">WRITE A LITTLE BETTER.</span></span>
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><path d="M8.5 11.5c4-2.4 8.6-2.2 11.5.6v17.4c-3-2.8-7.5-3-11.5-.6z" fill="currentColor" opacity=".96"/><path d="M31.5 11.5c-4-2.4-8.6-2.2-11.5.6v17.4c3-2.8 7.5-3 11.5-.6z" fill="currentColor" opacity=".72"/><path d="M20 12.4v17" stroke="#b9d59b" stroke-width="1.8" stroke-linecap="round"/><path d="m28.2 7.2.8 2.1 2.1.8-2.1.8-.8 2.1-.8-2.1-2.1-.8 2.1-.8z" fill="#e9cf83"/></svg></span>
+        <span class="brand-name">句进<span class="brand-tag">雅思写作工作台</span></span>
       </a>
       <nav class="header-actions" aria-label="工作台导航">
         <span class="connection" id="connection-status" role="status"><span class="status-dot"></span>正在连接 AI</span>
         <label class="sr-only" for="provider-select">下一篇分析使用的 AI 服务</label><select class="provider-select" id="provider-select" title="选择下一篇分析使用的 AI 服务"><option value="auto">自动选择 AI</option><option value="ollama">Ollama 本地</option><option value="openai-compatible">在线 AI</option><option value="codex">Codex CLI</option></select>
+        <button class="btn btn-ghost header-update-button" id="update-check" type="button"><span data-icon="refresh"></span>检查更新</button>
         <button class="btn btn-ghost" data-action="history"><span data-icon="history"></span>练习记录<span class="count-badge" id="history-count">0</span></button>
         <button class="btn btn-secondary" data-action="library"><span data-icon="bookmark"></span>我的复习库<span class="count-badge" id="library-count">0</span></button>
       </nav>
@@ -28,11 +29,11 @@
   </header>
   <main class="page">
     <section class="hero">
-      <div><p class="eyebrow">YOUR PERSONAL WRITING STUDIO <span class="eyebrow-line"></span></p><h1>把每一次修改，<span>写进下一次进步。</span></h1><p class="hero-copy">看清问题，理解修改，再把好表达变成自己的。</p></div>
-      <div class="hero-side"><span class="hero-step">01 写作</span><span>→</span><span class="hero-step">02 精修</span><span>→</span><span class="hero-step">03 内化</span></div>
+      <div><p class="eyebrow">雅思写作 · 个人工作台 <span class="eyebrow-line"></span></p><h1>把每一次修改，<span>写进下一次进步。</span></h1><p class="hero-copy">看清问题，理解修改，再把好表达变成自己的。</p></div>
+      <div class="hero-side"><span class="hero-step">01 写作</span><span>→</span><span class="hero-step">02 精修</span><span>→</span><span class="hero-step">03 复习</span></div>
     </section>
     <section class="prompt-card" aria-labelledby="prompt-label">
-      <div class="prompt-topline"><label for="prompt-input" class="section-kicker" id="prompt-label"><span data-icon="file"></span>本次写作题目 <span class="muted">THE QUESTION</span></label><button class="btn btn-ghost btn-small" data-action="demo"><span data-icon="spark"></span>体验完整示例</button></div>
+      <div class="prompt-topline"><label for="prompt-input" class="section-kicker" id="prompt-label"><span data-icon="file"></span>本次写作题目</label><button class="btn btn-ghost btn-small" data-action="demo"><span data-icon="spark"></span>体验完整示例</button></div>
       <textarea id="prompt-input" class="prompt-textarea" rows="3" maxlength="5000" placeholder="在这里粘贴完整题目：Task 1 图表说明/书信要点，或 Task 2 作文要求……" spellcheck="false" aria-describedby="prompt-guidance"></textarea>
       <div class="prompt-footer"><div class="prompt-options"><label class="target-control" for="task-type">写作题型<select id="task-type"><option value="task2">Task 2 · 大作文</option><option value="task1-academic">Task 1 · 学术类图表</option><option value="task1-general">Task 1 · 培训类书信</option></select></label><label class="target-control" for="target-band">目标分数<select id="target-band"><option value="6">Band 6.0</option><option value="6.5">Band 6.5</option><option value="7" selected>Band 7.0</option><option value="7.5">Band 7.5</option><option value="8">Band 8.0</option><option value="8.5">Band 8.5</option></select></label></div><span class="prompt-hint" id="prompt-guidance">建议 40 分钟 · 至少 250 词</span></div>
       <p id="task-guidance" class="cloud-ai-hint"></p>
@@ -78,19 +79,19 @@
     <div class="mobile-tabs" role="tablist" aria-label="作文对照"><button class="mobile-tab active" role="tab" aria-selected="true" aria-controls="original-panel" data-tab="original">01 我的原文</button><button class="mobile-tab" role="tab" aria-selected="false" aria-controls="corrected-panel" data-tab="corrected">02 精修版本</button><button class="mobile-tab" role="tab" aria-selected="false" aria-controls="model-panel" data-tab="model">03 高分范文</button></div>
     <section class="workspace-grid" aria-label="三栏作文学习工作台">
       <article class="essay-panel original-panel is-active" id="original-panel">
-        <div class="panel-heading"><span class="panel-number">01</span><div><h2 class="panel-title">我的原文</h2><p class="panel-subtitle">YOUR FIRST DRAFT</p></div><span class="panel-tools"><span data-icon="pen"></span></span></div>
+        <div class="panel-heading"><span class="panel-number">01</span><div><h2 class="panel-title">我的原文</h2><p class="panel-subtitle">先完整表达自己的观点</p></div><span class="panel-tools"><span data-icon="pen"></span></span></div>
         <div class="panel-tabs" aria-label="原文显示模式"><button class="panel-tab active" data-original-view="edit" aria-pressed="true">编辑原文</button><button class="panel-tab" data-original-view="review" aria-pressed="false" disabled>查看标注<span id="issue-count"></span></button></div>
         <div class="essay-body" id="original-body"><textarea id="essay-input" class="essay-textarea" aria-label="我的作文原文" placeholder="Every great essay starts with a first draft.&#10;&#10;在这里粘贴或写下你的英文作文。先完整表达你的观点，再一起把它变得更好。" spellcheck="false" maxlength="16000"></textarea><div class="essay-prose hidden" id="original-prose" lang="en"></div></div>
         <div class="panel-footer"><span id="word-count">0 words</span><span id="word-hint">写下你的第一个观点</span></div>
         <div id="original-score" class="score-block"></div>
       </article>
       <article class="essay-panel corrected-panel" id="corrected-panel">
-        <div class="panel-heading"><span class="panel-number">02</span><div><h2 class="panel-title">精修版本</h2><p class="panel-subtitle">YOUR IDEAS, REFINED</p></div><div class="panel-tools"><button class="icon-btn" data-action="copy-corrected" aria-label="复制精修版本" disabled><span data-icon="copy"></span></button></div></div>
+        <div class="panel-heading"><span class="panel-number">02</span><div><h2 class="panel-title">精修版本</h2><p class="panel-subtitle">保留原意，修正关键问题</p></div><div class="panel-tools"><button class="icon-btn" data-action="copy-corrected" aria-label="复制精修版本" disabled><span data-icon="copy"></span></button></div></div>
         <div class="panel-tabs"><span class="panel-tab active">保留原意 · 必要修改</span><span class="panel-mode-note">点击高亮看原因</span></div>
         <div class="essay-body" id="corrected-body"></div><div class="panel-footer"><span id="corrected-word-count">等待你的原文</span><button class="text-button" data-action="rewrite" disabled>用这个版本再练一次 <span aria-hidden="true">↗</span></button></div><div id="corrected-score" class="score-block"></div>
       </article>
       <article class="essay-panel model-panel" id="model-panel">
-        <div class="panel-heading"><span class="panel-number">03</span><div><h2 class="panel-title">高分范文</h2><p class="panel-subtitle">A FRESH PERSPECTIVE</p></div><div class="panel-tools"><button class="icon-btn" data-action="copy-model" aria-label="复制高分范文" disabled><span data-icon="copy"></span></button></div></div>
+        <div class="panel-heading"><span class="panel-number">03</span><div><h2 class="panel-title">高分范文</h2><p class="panel-subtitle">独立审题，提供另一种思路</p></div><div class="panel-tools"><button class="icon-btn" data-action="copy-model" aria-label="复制高分范文" disabled><span data-icon="copy"></span></button></div></div>
         <div class="panel-tabs"><span class="panel-tab active">独立审题 · 全新构思</span><button class="text-button" id="model-toggle" data-action="toggle-model" aria-controls="model-body" aria-expanded="false" disabled>展开范文</button></div>
         <div class="essay-body" id="model-body"></div><div class="panel-footer"><span id="model-word-count">另一种思路，同一道题</span><span class="model-source-label">仅根据题目创作</span></div><div id="model-score" class="score-block"></div>
       </article>
@@ -98,10 +99,10 @@
     <div class="under-workspace"><div class="legend"><span><i class="legend-dot grammar"></i>语法 / 拼写</span><span><i class="legend-dot vocabulary"></i>词汇 / 搭配</span><span><i class="legend-dot logic"></i>论证 / 衔接</span><span><i class="legend-dot expression"></i>可复用表达</span></div><span class="estimate-disclaimer">依据 IELTS 四项标准的 AI 练习估分，非官方成绩</span></div>
     <section class="priority-strip" id="priorities" aria-label="本次提分重点"></section>
     <section class="review-section" aria-labelledby="review-heading">
-      <div class="section-heading"><div><p class="eyebrow">MAKE IT YOURS</p><h2 id="review-heading">读懂了，还要用得出来。</h2><p class="section-description">把这次的错误和好表达，带到下一道题里。</p></div><div class="section-actions"><button class="btn btn-secondary btn-small" data-action="export" id="export-button" disabled><span data-icon="download"></span>导出学习笔记</button></div></div>
+      <div class="section-heading"><div><p class="eyebrow">学习闭环</p><h2 id="review-heading">读懂了，还要用得出来。</h2><p class="section-description">把这次的错误和好表达，带到下一道题里。</p></div><div class="section-actions"><button class="btn btn-secondary btn-small" data-action="export" id="export-button" disabled><span data-icon="download"></span>导出学习笔记</button></div></div>
       <div class="review-grid"><section class="review-column"><div class="review-column-heading"><h3><span data-icon="target"></span>我的易错点</h3><span class="review-count" id="errors-total">00</span></div><div id="review-errors"></div></section><section class="review-column"><div class="review-column-heading"><h3><span data-icon="link"></span>实用搭配</h3><span class="review-count" id="phrases-total">00</span></div><div id="review-phrases"></div></section><section class="review-column"><div class="review-column-heading"><h3><span data-icon="lightbulb"></span>好句与论证</h3><span class="review-count" id="notes-total">00</span></div><div id="review-notes"></div></section></div>
     </section>
-    <footer class="page-footer"><span>句进 · 一句一句，向前一步。 · v0.2.0</span><button class="text-button" id="update-check">检查更新</button><button class="text-button" data-action="about">评分说明与使用方法 <span aria-hidden="true">↗</span></button></footer>
+    <footer class="page-footer"><span>句进 · 一句一句，向前一步。 · v0.3.1</span><button class="text-button" data-action="about">评分说明与使用方法 <span aria-hidden="true">↗</span></button></footer>
   </main>
   <dialog class="cloud-ai-dialog" id="update-dialog" aria-labelledby="update-title">
     <div class="modal-header"><h2 id="update-title">软件更新</h2><button class="icon-btn" id="update-close" aria-label="关闭软件更新">✕</button></div>

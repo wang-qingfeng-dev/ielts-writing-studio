@@ -276,6 +276,10 @@ h1 > span { color: #7d9170; }
 #task-data-section { margin-top: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
 #task-data-section > label { font-size: 13px; font-weight: 600; }
 #task-data { width: 100%; min-height: 115px; margin-top: 8px; background: var(--surface); }
+#task-data-help { margin-bottom: 10px; }
+.task-image-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.task-image-name { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; max-width: 360px; }
+.task-image-preview { display: block; max-width: min(100%, 620px); max-height: 260px; margin: 8px 0 12px; border: 1px solid var(--line); border-radius: 8px; object-fit: contain; background: white; }
 #task-guidance { margin-top: 10px; }
 #cloud-provider-signup { white-space: normal; text-align: center; }
 .task-badge {

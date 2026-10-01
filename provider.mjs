@@ -167,3 +167,31 @@ export async function completeJson(provider, { system, prompt, schema, signal, m
   }
   throw new ProviderError(500,'Unsupported AI provider.');
 }
+
+// Task 1 图片只用于提取图表/流程/地图的文字材料；视觉模型的原始输出仍由后端校验，不能直接进入评分请求。
+export async function completeVisionJson(provider, { system, prompt, imageData, mimeType = 'image/png', schema, signal, maxTokens = 3000 }) {
+  if (!/^data:image\/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=]+$/.test(imageData || '')) throw new ProviderError(400, '图片格式无效，请选择 PNG、JPG 或 WebP 图片。');
+  if (provider.kind === 'compatible') {
+    const url = `${provider.url}/chat/completions`;
+    const instructions = `${system}\nReturn exactly one JSON object matching this JSON Schema:\n${JSON.stringify(schema)}`;
+    const base = { model: provider.model, messages: [{ role:'system', content:instructions }, { role:'user', content:[{type:'text',text:prompt},{type:'image_url',image_url:{url:imageData}}] }], temperature:0.1, max_tokens:maxTokens };
+    if (['api.deepseek.com','ark.cn-beijing.volces.com'].includes(new URL(provider.url).hostname)) base.thinking={type:'disabled'};
+    if (new URL(provider.url).hostname === 'openrouter.ai') base.reasoning={enabled:false};
+    const headers={'Content-Type':'application/json'};
+    const runtimeMatches = runtimeCloudConfig?.baseUrl === provider.url;
+    let environmentMatches = false;
+    try { environmentMatches = providerUrl(process.env.AI_BASE_URL || '', 'AI_BASE_URL') === provider.url; } catch {}
+    const key = runtimeMatches ? runtimeCloudConfig.apiKey : environmentMatches ? process.env.AI_API_KEY : undefined;
+    if (key) headers.Authorization=`Bearer ${key}`;
+    try { return parseCompatibleCompletion(await fetchJson(url,{method:'POST',headers,body:JSON.stringify({...base,response_format:{type:'json_object'}})},signal)); }
+    catch(error) { if(error.status===400) return parseCompatibleCompletion(await fetchJson(url,{method:'POST',headers,body:JSON.stringify(base)},signal)); throw error; }
+  }
+  if (provider.kind === 'ollama') {
+    const raw = imageData.split(',',2)[1];
+    const instructions = `${system}\nReturn one JSON object matching this schema:\n${JSON.stringify(schema)}`;
+    const body={model:provider.model,stream:false,messages:[{role:'system',content:instructions},{role:'user',content:prompt,images:[raw]}],options:{temperature:0.1,num_ctx:8192,num_predict:maxTokens}};
+    const data=await fetchJson(`${provider.url}/api/chat`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)},signal);
+    return parseJson(extractText(data));
+  }
+  throw new ProviderError(503, '当前 AI 模式不支持图片识别，请切换到支持视觉输入的在线模型或本地视觉模型。');
+}

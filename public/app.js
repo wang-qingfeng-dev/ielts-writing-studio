@@ -237,6 +237,7 @@ function renderAll() {
   updateWordCount();
   updateCounters();
   renderAnalysis();
+  if (taskImageRecognize) taskImageRecognize.disabled = !taskImage || state.busy || providerSwitching || localAiBusy || cloudAiBusy;
 }
 function clearResult() {
   if (state.analysis) {
@@ -261,6 +262,37 @@ $('#task-type').addEventListener('change', event=>{
   renderAll(); saveDraft();
 });
 $('#task-data').addEventListener('input', event=>{ clearResult(); state.taskData=event.target.value; scheduleSave(); });
+let taskImage = null;
+const taskImageInput = $('#task-image');
+const taskImageChoose = $('#task-image-choose');
+const taskImageRecognize = $('#task-image-recognize');
+const taskImageName = $('#task-image-name');
+const taskImagePreview = $('#task-image-preview');
+taskImageChoose?.addEventListener('click', () => taskImageInput.click());
+taskImageInput?.addEventListener('change', event => {
+  const file = event.target.files?.[0];
+  taskImage = file || null;
+  taskImageName.textContent = file ? `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB` : '未选择图片';
+  taskImageRecognize.disabled = !file || state.busy || providerSwitching || localAiBusy || cloudAiBusy;
+  if (file) { taskImagePreview.src = URL.createObjectURL(file); taskImagePreview.classList.remove('hidden'); }
+  else { taskImagePreview.removeAttribute('src'); taskImagePreview.classList.add('hidden'); }
+});
+taskImageRecognize?.addEventListener('click', async () => {
+  if (!taskImage || state.busy || providerSwitching || localAiBusy || cloudAiBusy) return;
+  if (taskImage.size > 10 * 1024 * 1024) { showError('图片不能超过 10 MB。'); return; }
+  const reader = new FileReader();
+  reader.onload = async () => {
+    taskImageRecognize.disabled = true; taskImageRecognize.textContent = '正在识别…';
+    try {
+      const response = await fetch('/api/task1/image-to-text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({imageData:reader.result,mimeType:taskImage.type})});
+      const result = await response.json(); if (!response.ok) throw new Error(result.error || '图片识别失败。');
+      clearResult(); state.taskData = result.sourceData; $('#task-data').value = result.sourceData; scheduleSave();
+      toast(result.notes?.length ? `已提取图表信息，请核对：${result.notes.join('；')}` : '已提取图表信息，请核对后再分析。');
+    } catch (error) { showError(error.message || '图片识别失败，请换一张清晰图片。'); }
+    finally { taskImageRecognize.disabled = !taskImage; taskImageRecognize.textContent = '识别图片并填入'; }
+  };
+  reader.readAsDataURL(taskImage);
+});
 $('#provider-select').addEventListener('change', event=>{ selectProvider(event.target.value); });
 window.addEventListener('pagehide', saveDraft);
 

@@ -1,6 +1,6 @@
 # 句进 · 雅思写作工作台
 
-> v0.2.0：新增 Task 1 小作文、国产在线 AI 引导、Windows 在线更新，以及 Apple Silicon / Intel 两种 Mac 包。请阅读[使用说明](docs/task1-online-preview.md)和[更新说明](docs/release-notes-v0.2.0.md)。
+> v0.3.0 桌面测试版：新增 Task 1 图片识别和 Electron 独立窗口。尚未发布正式 Release，请先阅读[桌面测试说明](docs/desktop-test-v0.3.0.md)。
 
 [English](README.en.md) · [下载 v0.2.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.2.0) · [更新记录](CHANGELOG.md)
 

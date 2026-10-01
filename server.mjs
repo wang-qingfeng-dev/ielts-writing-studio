@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { correctionSchema, modelSchema, validateCorrection, validateModel, validateAnalysis, validateRequest, ValidationError } from './analysis-schema.mjs';
-import { resolveProvider, getProviderStatus, setProviderOverride, getProviderOverride, completeJson, ProviderError, setCloudConfig } from './provider.mjs';
+import { resolveProvider, getProviderStatus, setProviderOverride, getProviderOverride, completeJson, completeVisionJson, ProviderError, setCloudConfig } from './provider.mjs';
 import { createLocalAIManager } from './local-ai.mjs';
 import { normalizeCorrection, normalizeModel } from './analysis-normalization.mjs';
 import { generateLocalModel } from './local-model.mjs';
@@ -19,6 +19,7 @@ const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
 const APP_VERSION = JSON.parse(await readFile(path.join(ROOT, 'package.json'), 'utf8')).version;
 const REQUEST_LIMIT = 128 * 1024;
+const IMAGE_REQUEST_LIMIT = 12 * 1024 * 1024;
 const ANALYSIS_TIMEOUT = 10 * 60 * 1000;
 const ENGINE = 'Codex · 当前已配置模型';
 const CODEX = process.env.IELTS_CODEX_PATH || (process.platform === 'win32' ? 'codex.exe' : 'codex');
@@ -290,6 +291,20 @@ export function createServer({ analyze = analyzeWriting, status = getEngineStatu
       if (url.pathname === '/api/status' && req.method === 'GET') return sendJson(res, 200, await status());
       if (url.pathname === '/api/provider' && req.method === 'GET') return sendJson(res, 200, await status());
       if (url.pathname === '/api/app-info' && req.method === 'GET') return sendJson(res, 200, { app: 'ielts-writing-studio', version: APP_VERSION, pid: process.pid });
+      if (url.pathname === '/api/task1/image-to-text' && req.method === 'POST') {
+        if (!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] || '')) throw new HttpError(415, '请使用 JSON 格式提交。');
+        if (busy || switching) throw new HttpError(409, '请完成当前分析或 AI 切换后再识别图片。');
+        const body = await readBody(req, IMAGE_REQUEST_LIMIT);
+        if (!body || typeof body !== 'object' || Array.isArray(body)) throw new HttpError(400, '图片识别请求格式无效。');
+        if (typeof body.imageData !== 'string' || body.imageData.length > IMAGE_REQUEST_LIMIT) throw new HttpError(413, '图片过大，请选择 10 MB 以内的图片。');
+        if (!/^data:image\/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=]+$/.test(body.imageData)) throw new HttpError(400, '请选择 PNG、JPG 或 WebP 图片。');
+        const provider = await resolveProvider();
+        if (!['compatible','ollama'].includes(provider.kind)) throw new HttpError(503, '当前 AI 模式不支持图片识别，请切换到在线视觉模型或本地视觉模型。');
+        const schema = {type:'object',properties:{sourceData:{type:'string',minLength:20,maxLength:10000},notes:{type:'array',items:{type:'string',maxLength:500},maxItems:6}},required:['sourceData','notes'],additionalProperties:false};
+        const result = await completeVisionJson(provider,{schema,imageData:body.imageData,mimeType:body.mimeType,system:'You extract IELTS Academic Task 1 chart, process or map information. Return JSON only. Never guess unreadable values. All sourceData and notes must be in Simplified Chinese or concise English labels.',prompt:'Read the uploaded IELTS Task 1 image. Transcribe only visible title, chart type, units, dates, categories, values, process stages, or map changes. If a number or label is unclear, write “待确认” next to it. Do not write an essay or give a band score.',signal:AbortSignal.timeout(120000),maxTokens:3000});
+        if (!result || typeof result.sourceData !== 'string' || result.sourceData.trim().length < 20) throw new HttpError(502, '视觉模型没有提取出足够的图表信息，请换一张清晰图片或手动补充。');
+        return sendJson(res, 200, {sourceData:result.sourceData.trim(),notes:Array.isArray(result.notes)?result.notes.filter(x=>typeof x==='string').slice(0,6):[],provider:provider.model});
+      }
       if (url.pathname === '/api/local-ai/status' && req.method === 'GET') return sendJson(res, 200, await localAI.getStatus());
       if (url.pathname === '/api/local-ai/start' && req.method === 'POST') {
         if (!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] || '')) throw new HttpError(415, '请使用 JSON 格式提交。');

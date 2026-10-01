@@ -38,7 +38,9 @@
       <p id="task-guidance" class="cloud-ai-hint"></p>
       <div id="task-data-section" class="hidden">
         <label for="task-data">图表原始信息 / 流程 / 地图描述</label>
-        <p id="task-data-help" class="cloud-ai-hint">请从原图填写标题、单位、时间、分类及数值；流程题填写阶段，地图题填写位置和变化。目前使用文字材料，不能直接读取图片。不要复制自己的作文代替原图信息。</p>
+        <p id="task-data-help" class="cloud-ai-hint">可以上传清晰的 PNG/JPG/WebP 原图，让支持视觉输入的 AI 先提取标题、单位、时间、分类和数值；识别结果会先放在下面供你核对，模糊内容标为“待确认”。需要在在线 AI 设置中选择支持视觉输入的模型。</p>
+        <div class="task-image-tools"><input id="task-image" type="file" accept="image/png,image/jpeg,image/webp" hidden><button class="btn btn-secondary btn-small" id="task-image-choose" type="button">上传 Task 1 图片</button><button class="btn btn-primary btn-small" id="task-image-recognize" type="button" disabled>识别图片并填入</button><span id="task-image-name" class="task-image-name">未选择图片</span></div>
+        <img id="task-image-preview" class="task-image-preview hidden" alt="待识别的 Task 1 图片预览">
         <textarea id="task-data" class="prompt-textarea" rows="5" maxlength="10000" aria-describedby="task-data-help" placeholder="例如：柱状图，某城市通勤方式占比（%）。2000 年：汽车 40、公交 35、骑行 25；2020 年：汽车 55、公交 30、骑行 15。请填写你题目中的真实信息。"></textarea>
       </div>
     </section>

@@ -938,6 +938,39 @@ h1 { letter-spacing: -1.25px; }
 .btn-primary:hover:not(:disabled) { box-shadow: 0 10px 22px rgb(31 103 78 / 22%); }
 .toast { border-radius: 13px; box-shadow: 0 12px 32px rgb(25 49 30 / 22%); }
 
+/* iOS 风格毛玻璃层：使用弹性 cubic-bezier，保留 prefers-reduced-motion 的无动画降级。 */
+.app-header {
+  background: rgb(248 251 249 / 64%);
+  -webkit-backdrop-filter: blur(26px) saturate(145%);
+  backdrop-filter: blur(26px) saturate(145%);
+}
+.prompt-card, .workspace-toolbar, .essay-panel, .review-column, .cloud-ai-card, .local-ai-setup, .hero-side {
+  background: rgb(255 255 255 / 58%);
+  -webkit-backdrop-filter: blur(22px) saturate(132%);
+  backdrop-filter: blur(22px) saturate(132%);
+}
+.prompt-card, .essay-panel, .review-column { box-shadow: 0 16px 50px rgb(28 58 44 / 7%), inset 0 1px 0 rgb(255 255 255 / 74%); }
+.workspace-toolbar { box-shadow: 0 12px 35px rgb(28 58 44 / 6%), inset 0 1px 0 rgb(255 255 255 / 70%); }
+.btn:active:not(:disabled), .icon-btn:active, .text-button:active:not(:disabled) { transform: scale(.97); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero > div:first-child, .hero-side, .prompt-card, .cloud-ai-card, .local-ai-setup, .workspace-toolbar, .workspace-grid, .review-section {
+    animation: studio-rise .72s cubic-bezier(.22, .85, .28, 1.18) both;
+  }
+  .hero-side { animation-delay: 70ms; }
+  .prompt-card { animation-delay: 110ms; }
+  .cloud-ai-card { animation-delay: 160ms; }
+  .local-ai-setup { animation-delay: 210ms; }
+  .workspace-toolbar { animation-delay: 260ms; }
+  .workspace-grid { animation-delay: 310ms; }
+  .review-section { animation-delay: 360ms; }
+  .essay-panel { transition: transform .34s cubic-bezier(.22, .85, .28, 1.18), box-shadow .28s ease, border-color .28s ease; }
+  @keyframes studio-rise {
+    from { opacity: 0; transform: translateY(14px) scale(.992); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+}
+
 @media (max-width: 999px) {
   .header-inner { height: 70px; }
   .header-update-button { display: none; }

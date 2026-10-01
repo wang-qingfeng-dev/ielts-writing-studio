@@ -1,6 +1,6 @@
 # 句进 · 雅思写作工作台
 
-> v0.3.1 桌面测试版：修复桌面窗口启动错误，移除 Electron 默认菜单，更新中文软件布局和 Logo。尚未发布正式 Release，请先阅读[桌面测试说明](docs/desktop-test-v0.3.1.md)。
+> v0.3.0 桌面测试版：修复桌面窗口启动错误，移除 Electron 默认菜单，更新中文软件布局和 Logo。尚未发布正式 Release，请先阅读[桌面测试说明](docs/desktop-test-v0.3.0.md)。
 
 [English](README.en.md) · [下载 v0.2.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.2.0) · [更新记录](CHANGELOG.md)
 

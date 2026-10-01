@@ -23,6 +23,7 @@ function createWindow() {
     minWidth: 980,
     minHeight: 680,
     title: '句进 · 雅思写作工作台',
+    icon: path.join(root, '..', 'public', 'app-icon.ico'),
     backgroundColor: '#f6f5ef',
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }
   });

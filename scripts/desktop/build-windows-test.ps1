@@ -20,5 +20,5 @@ Copy-Item (Join-Path $root 'scripts\desktop\Start Jujin Desktop.cmd') $out
 Copy-Item (Join-Path $root 'scripts\desktop\README.test.zh-CN.md') (Join-Path $out 'README.test.zh-CN.md')
 $zip=Join-Path $root "release-artifacts\ielts-writing-studio-v$version-windows-x64-desktop-test.zip"
 Remove-Item $zip -Force -ErrorAction SilentlyContinue
-Compress-Archive -Path (Join-Path $out '*') -DestinationPath $zip -CompressionLevel Optimal
+Compress-Archive -Path (Join-Path $out '*') -DestinationPath $zip -CompressionLevel Optimal -Force
 Get-FileHash $zip -Algorithm SHA256 | Select-Object Path,Hash

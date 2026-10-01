@@ -52,12 +52,33 @@ function runProcess(command, args, { cwd, input = '', signal, timeout = ANALYSIS
   });
 }
 
-export async function getCodexStatus() {
+async function findCodexCommand() {
+  if (process.env.IELTS_CODEX_PATH?.trim()) return process.env.IELTS_CODEX_PATH.trim();
+  const locator = process.platform === 'win32' ? 'where.exe' : 'which';
   try {
-    const result = await runProcess(CODEX, ['login', 'status'], { timeout: 10000, maxOutput: 16000 });
+    const result = await runProcess(locator, [CODEX], { timeout: 2500, maxOutput: 8000 });
+    const candidate = result.stdout.split(/\r?\n/u).map(line => line.trim()).find(Boolean);
+    if (result.code === 0 && candidate) return candidate;
+  } catch { /* PATH 查询失败时交给 spawn 返回可操作的错误。 */ }
+  return CODEX;
+}
+async function readCodexModel() {
+  const configPath = path.join(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'config.toml');
+  try {
+    const config = await readFile(configPath, 'utf8');
+    const match = config.match(/^\s*model\s*=\s*["']([^"']+)["']/mu);
+    return match?.[1] || '当前配置模型';
+  } catch { return '当前配置模型'; }
+}
+
+export async function getCodexStatus() {
+  const command = await findCodexCommand();
+  const model = await readCodexModel();
+  try {
+    const result = await runProcess(command, ['login', 'status'], { timeout: 10000, maxOutput: 16000 });
     const available = result.code === 0 && /logged in/i.test(result.stdout + result.stderr);
-    return { available, engine: ENGINE, message: available ? '已连接当前电脑的 Codex，支持真实作文分析。' : '请先在此电脑运行 codex login，登录后刷新连接。' };
-  } catch { return { available: false, engine: ENGINE, message: '未找到可用的 Codex。请安装并登录后重试。' }; }
+    return { available, engine: `Codex CLI · ${model}`, message: available ? '已连接当前电脑的 Codex，支持真实作文分析。' : 'Codex CLI 已找到，但当前未登录。请运行 codex login 后刷新连接。' };
+  } catch { return { available: false, engine: `Codex CLI · ${model}`, message: '未找到 Codex CLI。请确认 Codex 已安装，或设置 IELTS_CODEX_PATH 后重启软件。' }; }
 }
 export async function getEngineStatus() {
   const status = await getProviderStatus();

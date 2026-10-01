@@ -1,4 +1,6 @@
 // 在线 AI 配置只在本机服务端保存；页面不把密钥写入浏览器存储。
+import { closeAnchoredDialog, showAnchoredDialog } from './dialog-motion.js';
+
 export function initCloudAiSetup(options = {}) {
   const byId = id => document.getElementById(id);
   const dialog = byId('cloud-ai-dialog');
@@ -108,13 +110,13 @@ export function initCloudAiSetup(options = {}) {
     updateControls();
     return result;
   }
-  async function open() {
+  async function open(trigger = openButton) {
     if (options.isBusy?.() || busy) return;
     lastFocused = document.activeElement;
     const currentSession = ++sessionId;
     setFeedback('正在读取设置…');
     loading = true; updateControls();
-    dialog.showModal();
+    showAnchoredDialog(dialog, trigger);
     try {
       const result = await request();
       if (!dialog.open || currentSession !== sessionId) return;
@@ -123,8 +125,8 @@ export function initCloudAiSetup(options = {}) {
       if (dialog.open && currentSession === sessionId) setFeedback(error.message || '读取设置失败，请关闭后重试。', true);
     } finally { loading = false; updateControls(); }
   }
-  function close() { if (dialog.open) dialog.close(); }
-  openButton.addEventListener('click', open);
+  function close() { closeAnchoredDialog(dialog); }
+  openButton.addEventListener('click', () => open(openButton));
   byId('cloud-ai-close').addEventListener('click', close);
   byId('cloud-ai-cancel').addEventListener('click', close);
   dialog.addEventListener('close', () => {
@@ -134,6 +136,7 @@ export function initCloudAiSetup(options = {}) {
     requestController?.abort();
     if (lastFocused?.isConnected) lastFocused.focus();
   });
+  dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
   providerInput.addEventListener('change', () => { showProvider(); setFeedback(); });
   baseInput.addEventListener('input', updateKeyHint);
   form.addEventListener('invalid', event => {

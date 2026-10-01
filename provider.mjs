@@ -34,6 +34,10 @@ function providerUrl(value, setting) {
 function ollamaUrl() { return providerUrl(process.env.OLLAMA_HOST || DEFAULT_OLLAMA_URL, 'OLLAMA_HOST'); }
 function compatibleUrl() { return providerUrl(runtimeCloudConfig?.baseUrl || process.env.AI_BASE_URL || '', 'AI_BASE_URL'); }
 function isConfiguredCompatible() { return Boolean(runtimeCloudConfig?.baseUrl || process.env.AI_BASE_URL?.trim()); }
+function compatibleProviderName() {
+  const labels = { deepseek:'DeepSeek', doubao:'豆包模型 · 火山方舟', siliconflow:'硅基流动', hunyuan:'腾讯混元 API', openrouter:'OpenRouter 免费模型路由', custom:'自定义在线接口' };
+  return labels[runtimeCloudConfig?.provider] || 'OpenAI 兼容接口';
+}
 
 async function fetchJson(url, options = {}, signal) {
   if (signal?.aborted) {
@@ -73,7 +77,7 @@ async function ollamaAvailable() {
 export async function resolveProvider() {
   const selected = selectedProvider();
   const localProvider = () => ({ kind:'ollama', name:'Ollama 本地免费模型', model:modelName('ollama'), url:ollamaUrl() });
-  const compatibleProvider = () => ({ kind:'compatible', name:'OpenAI 兼容接口', model:modelName('compatible'), url:compatibleUrl() });
+  const compatibleProvider = () => ({ kind:'compatible', name:compatibleProviderName(), model:modelName('compatible'), url:compatibleUrl() });
   if (selected === 'ollama') return localProvider();
   if (selected === 'openai-compatible') {
     if (!isConfiguredCompatible()) throw new ProviderError(503, '未配置 AI_BASE_URL。');

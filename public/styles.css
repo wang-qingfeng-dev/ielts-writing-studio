@@ -163,6 +163,9 @@ body:has(.cloud-ai-dialog[open]) { overflow: hidden; }
   color: var(--muted);
   font-size: 11px;
   white-space: nowrap;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .connection::before {
   content: "";
@@ -938,6 +941,30 @@ h1 { letter-spacing: -1.25px; }
 .btn-primary:hover:not(:disabled) { box-shadow: 0 10px 22px rgb(31 103 78 / 22%); }
 .toast { border-radius: 13px; box-shadow: 0 12px 32px rgb(25 49 30 / 22%); }
 
+/* 交互层从触发控件的位置展开，关闭时沿同一轨迹回到原位。 */
+.modal-backdrop { animation: backdrop-in .32s ease-out both; }
+.modal-backdrop.is-closing { animation: backdrop-out .25s ease-in both; pointer-events: none; }
+.modal {
+  transform: scale(.08);
+  transform-origin: var(--modal-origin-x, 50%) var(--modal-origin-y, 50%);
+  opacity: 0;
+}
+.modal.is-visible { animation: modal-in .48s cubic-bezier(.16, 1, .3, 1.16) both; }
+.modal.is-closing { animation: modal-out .27s cubic-bezier(.4, 0, 1, 1) both; }
+.cloud-ai-dialog[open] {
+  opacity: 0;
+  transform: scale(.08);
+  transform-origin: var(--dialog-origin-x, 50%) var(--dialog-origin-y, 50%);
+}
+.cloud-ai-dialog[open].is-visible { animation: dialog-in .48s cubic-bezier(.16, 1, .3, 1.16) both; }
+.cloud-ai-dialog[open].is-closing { animation: dialog-out .27s cubic-bezier(.4, 0, 1, 1) both; pointer-events: none; }
+@keyframes backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes backdrop-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes modal-in { from { opacity: 0; transform: scale(.08); } to { opacity: 1; transform: scale(1); } }
+@keyframes modal-out { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(.08); } }
+@keyframes dialog-in { from { opacity: 0; transform: scale(.08); } to { opacity: 1; transform: scale(1); } }
+@keyframes dialog-out { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(.08); } }
+
 /* iOS 风格毛玻璃层：使用弹性 cubic-bezier，保留 prefers-reduced-motion 的无动画降级。 */
 .app-header {
   background: rgb(248 251 249 / 64%);
@@ -969,6 +996,9 @@ h1 { letter-spacing: -1.25px; }
     from { opacity: 0; transform: translateY(14px) scale(.992); }
     to { opacity: 1; transform: translateY(0) scale(1); }
   }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop, .modal, .cloud-ai-dialog[open] { animation: none !important; transition: none !important; opacity: 1; transform: none; }
 }
 
 @media (max-width: 999px) {

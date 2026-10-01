@@ -1,4 +1,6 @@
 // 更新只在用户点击时检查；不自动下载，也不打断正在进行的批改。
+import { closeAnchoredDialog, showAnchoredDialog } from './dialog-motion.js';
+
 export function initAppUpdates({isBusy, saveDraft}) {
   const dialog = document.querySelector('#update-dialog');
   const message = document.querySelector('#update-message');
@@ -9,8 +11,8 @@ export function initAppUpdates({isBusy, saveDraft}) {
     const response = await fetch(url, {method, ...(method==='POST' ? {headers:{'Content-Type':'application/json'},body:'{}'} : {})});
     const result = await response.json(); if (!response.ok) throw new Error(result.error || '更新请求失败'); return result;
   }
-  document.querySelector('#update-check').addEventListener('click', async () => {
-    dialog.showModal(); if (active) return;
+  document.querySelector('#update-check').addEventListener('click', async event => {
+    showAnchoredDialog(dialog, event.currentTarget); if (active) return;
     install.hidden = true; message.textContent = '正在检查 GitHub 最新版本…';
     try {
       const info = await request('/api/updates');
@@ -18,8 +20,8 @@ export function initAppUpdates({isBusy, saveDraft}) {
       install.hidden = !info.available || !info.canInstall;
     } catch(error) { message.textContent = error.message; }
   });
-  close.addEventListener('click', () => dialog.close());
-  dialog.addEventListener('cancel', event => { if (active) event.preventDefault(); });
+  close.addEventListener('click', () => closeAnchoredDialog(dialog));
+  dialog.addEventListener('cancel', event => { event.preventDefault(); if (!active) closeAnchoredDialog(dialog); });
   install.addEventListener('click', async () => {
     if (active) return;
     if (isBusy()) { message.textContent = '请先完成批改或 AI 准备，再安装更新。'; return; }

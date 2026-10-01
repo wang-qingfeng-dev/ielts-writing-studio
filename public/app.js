@@ -61,6 +61,7 @@ let saveTimer;
 let progressTimer;
 let toastTimer;
 let modalReturnFocus;
+let modalCloseTimer;
 let libraryView = { all:false, index:0, revealed:false };
 let practiceAnswers = new Map();
 let connection = { available:false, checked:false };
@@ -107,6 +108,13 @@ function updateProviderControls(info = providerInfo) {
   select.title = providerInfo.message || '选择下一篇分析使用的 AI 服务；在线服务可在「设置在线 AI」中配置。';
   select.disabled = state.busy || providerSwitching || localAiBusy || cloudAiBusy;
   cloudAiSetup?.updateControls();
+}
+function connectionLabel(result) {
+  const engine = String(result?.engine || '当前 AI').replace(/\s+/gu, ' ').trim();
+  return `${result?.available ? '已连接' : '未连接'} · ${engine}`;
+}
+function safeConnectionLabel(result) {
+  return connectionLabel(result).replace(/[&<>"']/gu, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[character]);
 }
 function updateWordCount() {
   const words = countWords(state.essay);
@@ -317,7 +325,9 @@ async function checkConnection() {
     if (requestId !== connectionRequest) return;
     connection = result;
     updateProviderControls(connection);
-    el.innerHTML = `<span class="status-dot ${connection.available?'':'offline'}"></span>${connection.available?'模型已连接':'AI 暂未连接'}`;
+    const engine = String(connection.engine || '当前 AI').replace(/\s+/gu, ' ').trim();
+    const label = `${connection.available ? '已连接' : '未连接'} · ${engine}`.replace(/[&<>"']/gu, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[character]);
+    el.innerHTML = `<span class="status-dot ${connection.available?'':'offline'}"></span>${label}`;
     el.title = connection.message || '';
   } catch { if(requestId !== connectionRequest)return; connection={available:false,checked:true}; el.innerHTML='<span class="status-dot offline"></span>服务未连接'; el.title='请运行 npm start，或双击项目目录中的 Start Writing Studio.cmd。'; updateProviderControls(); }
 }
@@ -334,7 +344,10 @@ async function switchProvider(next) {
     providerInfo = result; updateProviderControls(result);
     const label = result.provider === 'ollama' ? '本地 AI' : result.provider === 'codex' ? 'Codex' : result.engine || '所选 AI';
     toast(`已切换到 ${label}。${result.available?'可以开始分析。':result.message || '当前模式尚未连接。'}`);
-    const el=$('#connection-status');el.innerHTML=`<span class="status-dot ${result.available?'':'offline'}"></span>${result.available?'模型已连接':'AI 暂未连接'}`;el.title=result.message||'';
+    const el=$('#connection-status');
+    const engine = String(result.engine || '当前 AI').replace(/\s+/gu, ' ').trim();
+    const statusLabel = `${result.available ? '已连接' : '未连接'} · ${engine}`.replace(/[&<>"']/gu, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[character]);
+    el.innerHTML=`<span class="status-dot ${result.available?'':'offline'}"></span>${statusLabel}`;el.title=result.message||'';
   } catch (error) {
     toast(error.name === 'TimeoutError' ? '切换等待超时，正在重新检查当前 AI 模式。' : error.message || '切换 AI 模式失败。');
     // 响应中断前，服务端可能已经接受了这次切换。
@@ -401,14 +414,32 @@ function setMobileTab(tab) {
   $$('.essay-panel').forEach(panel=>panel.classList.toggle('is-active',panel.id===`${tab}-panel`));
 }
 function openModal(title, body, footer='') {
+  clearTimeout(modalCloseTimer);
   if (!$('#modal-root').firstElementChild) modalReturnFocus = document.activeElement;
   $('#modal-root').innerHTML=`<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><div class="modal-header"><h2 id="dialog-title">${e(title)}</h2><button class="icon-btn close-modal" data-action="close-modal" aria-label="关闭弹窗">${icon('close')}</button></div><div class="modal-body">${body}</div>${footer?`<div class="modal-footer">${footer}</div>`:''}</section></div>`;
   document.body.classList.add('modal-open');
+  const trigger = modalReturnFocus;
+  const modal = $('#modal-root .modal');
+  if (trigger && modal) {
+    const source = trigger.getBoundingClientRect();
+    const target = modal.getBoundingClientRect();
+    modal.style.setProperty('--modal-origin-x', `${Math.max(0, source.left + source.width / 2 - target.left)}px`);
+    modal.style.setProperty('--modal-origin-y', `${Math.max(0, source.top + source.height / 2 - target.top)}px`);
+  }
+  requestAnimationFrame(() => $('#modal-root .modal')?.classList.add('is-visible'));
   $('#modal-root .close-modal').focus();
 }
 function closeModal() {
-  $('#modal-root').innerHTML=''; document.body.classList.remove('modal-open');
-  if (modalReturnFocus?.isConnected) modalReturnFocus.focus();
+  const root = $('#modal-root');
+  const backdrop = root.firstElementChild;
+  const modal = root.querySelector('.modal');
+  if (!backdrop || !modal || backdrop.classList.contains('is-closing')) return;
+  backdrop.classList.add('is-closing'); modal.classList.remove('is-visible'); modal.classList.add('is-closing');
+  modalCloseTimer = window.setTimeout(() => {
+    root.innerHTML=''; document.body.classList.remove('modal-open');
+    if (modalReturnFocus?.isConnected) modalReturnFocus.focus();
+    modalReturnFocus = null;
+  }, 270);
 }
 function markActive(id) {
   $$('[data-annotation]').forEach(el=>el.classList.toggle('active',el.dataset.annotation===id));

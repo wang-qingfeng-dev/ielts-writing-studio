@@ -20,7 +20,7 @@
       </a>
       <nav class="header-actions" aria-label="工作台导航">
         <span class="connection" id="connection-status" role="status"><span class="status-dot"></span>正在连接 AI</span>
-        <label class="sr-only" for="provider-select">下一篇分析使用的 AI 服务</label><select class="provider-select" id="provider-select" title="选择下一篇分析使用的 AI 服务"><option value="auto">自动选择 AI</option><option value="ollama">Ollama 本地</option><option value="openai-compatible">在线 AI</option><option value="codex">Codex CLI</option></select>
+        <label class="sr-only" for="provider-select">下一篇分析使用的 AI 服务</label><select class="provider-select" id="provider-select" title="选择下一篇分析使用的 AI 服务"><option value="auto">自动选择 AI</option><option value="ollama">Ollama 本地</option><option value="openai-compatible">在线 AI</option><option value="workbuddy">WorkBuddy CLI</option><option value="codex">Codex CLI</option></select>
         <button class="btn btn-ghost header-update-button" id="update-check" type="button"><span data-icon="refresh"></span>检查更新</button>
         <button class="btn btn-ghost" data-action="history"><span data-icon="history"></span>练习记录<span class="count-badge" id="history-count">0</span></button>
         <button class="btn btn-secondary" data-action="library"><span data-icon="bookmark"></span>我的复习库<span class="count-badge" id="library-count">0</span></button>
@@ -49,7 +49,7 @@
     <div id="analysis-warning" class="notice-banner hidden" role="status"></div>
     <div id="error" class="error-banner hidden" role="alert"></div>
     <section class="cloud-ai-card" aria-labelledby="cloud-ai-title">
-      <div><h2 id="cloud-ai-title">电脑配置不高？使用在线 AI</h2><p id="cloud-ai-summary">不用下载模型。选择服务商，粘贴一次自己的 API 密钥，即可联网批改。免费额度与收费以服务商当前规则为准。</p></div>
+      <div><h2 id="cloud-ai-title">不想在本机跑模型？先用免费在线 AI</h2><p id="cloud-ai-summary">不用下载模型。列表里排在前面的是当前有免费额度的服务（智谱 GLM Flash、豆包、混元 lite 等），粘贴一次自己的 API 密钥即可联网批改；额度用完再决定是否付费。</p></div>
       <button class="btn btn-secondary" id="cloud-ai-open" type="button">设置在线 AI <span aria-hidden="true">↗</span></button>
     </section>
     <section class="local-ai-setup hidden" id="local-ai-setup" aria-labelledby="local-ai-setup-title">
@@ -98,11 +98,12 @@
     </section>
     <div class="under-workspace"><div class="legend"><span><i class="legend-dot grammar"></i>语法 / 拼写</span><span><i class="legend-dot vocabulary"></i>词汇 / 搭配</span><span><i class="legend-dot logic"></i>论证 / 衔接</span><span><i class="legend-dot expression"></i>可复用表达</span></div><span class="estimate-disclaimer">依据 IELTS 四项标准的 AI 练习估分，非官方成绩</span></div>
     <section class="priority-strip" id="priorities" aria-label="本次提分重点"></section>
+    <section class="drill-section" id="drill-section" aria-labelledby="drill-heading"></section>
     <section class="review-section" aria-labelledby="review-heading">
       <div class="section-heading"><div><p class="eyebrow">学习闭环</p><h2 id="review-heading">读懂了，还要用得出来。</h2><p class="section-description">把这次的错误和好表达，带到下一道题里。</p></div><div class="section-actions"><button class="btn btn-secondary btn-small" data-action="export" id="export-button" disabled><span data-icon="download"></span>导出学习笔记</button></div></div>
       <div class="review-grid"><section class="review-column"><div class="review-column-heading"><h3><span data-icon="target"></span>我的易错点</h3><span class="review-count" id="errors-total">00</span></div><div id="review-errors"></div></section><section class="review-column"><div class="review-column-heading"><h3><span data-icon="link"></span>实用搭配</h3><span class="review-count" id="phrases-total">00</span></div><div id="review-phrases"></div></section><section class="review-column"><div class="review-column-heading"><h3><span data-icon="lightbulb"></span>好句与论证</h3><span class="review-count" id="notes-total">00</span></div><div id="review-notes"></div></section></div>
     </section>
-    <footer class="page-footer"><span>句进 · 一句一句，向前一步。 · v0.3.0</span><button class="text-button" data-action="about">评分说明与使用方法 <span aria-hidden="true">↗</span></button></footer>
+    <footer class="page-footer"><span>句进 · 一句一句，向前一步。 · v0.4.0</span><button class="text-button" data-action="about">评分说明与使用方法 <span aria-hidden="true">↗</span></button></footer>
   </main>
   <dialog class="cloud-ai-dialog" id="update-dialog" aria-labelledby="update-title">
     <div class="modal-header"><h2 id="update-title">软件更新</h2><button class="icon-btn" id="update-close" aria-label="关闭软件更新">✕</button></div>
@@ -124,6 +125,17 @@
           <p id="cloud-key-help" class="cloud-ai-hint">密钥保存在这台电脑的应用配置中，不写入作文记录或 GitHub。不要在共享电脑上保存自己的密钥。</p>
           <details id="cloud-advanced"><summary>模型与接口地址</summary><div class="cloud-advanced-fields"><label for="cloud-model">模型名称</label><input id="cloud-model" name="model" type="text" maxlength="200" autocomplete="off" required><label for="cloud-base-url">API 地址</label><input id="cloud-base-url" name="baseUrl" type="url" maxlength="500" autocomplete="off" required aria-describedby="cloud-base-help"><p id="cloud-base-help" class="cloud-ai-hint">预设服务无需修改。自定义服务请填写兼容接口的基础地址，通常以 /v1 结尾。</p></div></details>
           <label class="cloud-consent" for="cloud-consent"><input id="cloud-consent" type="checkbox" required><span>我同意分析时将题目和作文发送给所选服务商，并使用我的账户额度；测试连接也会发送一条简短测试请求。</span></label>
+          <details id="cloud-troubleshoot"><summary>连接失败怎么排查？</summary>
+            <div class="cloud-advanced-fields">
+              <p class="cloud-ai-hint">本窗口的错误提示会带上服务商返回的 HTTP 状态码，按下面的情况对照处理：</p>
+              <p class="cloud-ai-hint">· <strong>HTTP 401</strong>：密钥不对或被删除了。重新复制整串密钥，注意不要带上空格或换行。</p>
+              <p class="cloud-ai-hint">· <strong>HTTP 402</strong>：账户余额不足。DeepSeek 需要先在控制台“充值”；豆包需要先在火山方舟开通所选模型。</p>
+              <p class="cloud-ai-hint">· <strong>HTTP 400 / 404</strong>：模型名称或地址不对。预设服务不要改地址；自定义服务通常以 <code>/v1</code> 结尾。</p>
+              <p class="cloud-ai-hint">· <strong>连接超时或无法连接</strong>：这台电脑访问不了服务商，先确认浏览器能打开对方官网，或换网络后重试。</p>
+              <p class="cloud-ai-hint">· <strong>“未通过 JSON 连接检查”</strong>：能用但不是对话模型（例如只做向量或语音），换一个对话模型。</p>
+              <p class="cloud-ai-hint">本地 Ollama 报错时，页面会告诉你缺哪个模型、电脑上已装了哪些模型，以及要执行的 <code>ollama pull 模型名</code> 命令。</p>
+            </div>
+          </details>
         </fieldset>
         <p id="cloud-ai-feedback" class="cloud-ai-feedback hidden" role="status" aria-live="polite"></p>
       </div>

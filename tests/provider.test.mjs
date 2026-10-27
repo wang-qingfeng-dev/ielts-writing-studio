@@ -394,3 +394,59 @@ test('an in-flight connection probe timeout aborts the transport and stays disti
   await closed;
   assert.equal(calls, 1);
 });
+
+test('upstream HTTP failures keep the provider reason and the matching next step', async t => {
+  const cases = [
+    { status: 402, body: { error: { message: 'Insufficient Balance', type: 'unknown_error' } }, expect: [/402/, /余额不足/, /Insufficient Balance/] },
+    { status: 400, body: { error: { message: 'Model Not Exist', type: 'invalid_request_error' } }, expect: [/400/, /模型名称/, /Model Not Exist/] },
+    { status: 404, body: { error: { message: 'model "qwen3.5:4b" not found' } }, expect: [/404/, /模型不存在|接口地址/, /not found/] },
+    { status: 429, body: { error: { message: 'Rate limit reached' } }, expect: [/429/, /限流/, /Rate limit/] },
+    { status: 503, body: { error: { message: 'Server is busy' } }, expect: [/503/, /故障/, /Server is busy/] },
+  ];
+  for (const item of cases) {
+    const base = await serveJson(t, (_req, res) => {
+      res.writeHead(item.status, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(item.body));
+    });
+    await assert.rejects(
+      completeJson({ kind: 'compatible', url: base, model: 'deepseek-flash', apiKey: 'test-key' }, { system: 'system', prompt: 'prompt', schema: { type: 'object' } }),
+      error => {
+        assert.equal(error.status, item.status);
+        for (const pattern of item.expect) assert.match(error.message, pattern, `${item.status}: ${error.message}`);
+        assert.ok(!error.message.includes('test-key'), '错误文案不得包含密钥');
+        return true;
+      }
+    );
+  }
+});
+
+test('a DeepSeek balance failure points at the recharge page instead of a generic message', async t => {
+  const base = await serveJson(t, (_req, res) => { res.writeHead(402); res.end(JSON.stringify({ error: { message: 'Insufficient Balance' } })); });
+  await assert.rejects(
+    completeJson({ kind: 'compatible', url: `${base}/`, model: 'deepseek-flash' }, { system: 'system', prompt: 'prompt', schema: { type: 'object' } }),
+    error => error.status === 402 && /balance|余额/i.test(error.message)
+  );
+});
+
+test('a local analysis stops with the exact pull command when the Ollama model is missing', async t => {
+  const { state, url } = await fakeOllama(t);
+  state.models = ['qwen2.5:3b'];
+  configure(t, { AI_PROVIDER: 'ollama', OLLAMA_HOST: url, AI_MODEL: 'qwen3.5:4b' });
+  await assert.rejects(
+    analyzeWriting({ prompt: DEMO_PROMPT, essay: DEMO_ESSAY, targetBand: 7 }),
+    error => error.status === 503
+      && /qwen3\.5:4b/.test(error.message)
+      && /ollama pull qwen3\.5:4b/.test(error.message)
+      && /qwen2\.5:3b/.test(error.message)
+      && /一键准备本地 AI/.test(error.message)
+  );
+  assert.equal(state.requests.length, 0, '模型缺失时不应发出批改请求');
+});
+
+test('a local analysis explains that Ollama itself is not running', async t => {
+  configure(t, { AI_PROVIDER: 'ollama', OLLAMA_HOST: 'http://127.0.0.1:1', AI_MODEL: 'qwen3.5:4b' });
+  await assert.rejects(
+    analyzeWriting({ prompt: DEMO_PROMPT, essay: DEMO_ESSAY, targetBand: 7 }),
+    error => error.status === 503 && /没有检测到本地 Ollama/.test(error.message) && /127\.0\.0\.1:1/.test(error.message)
+  );
+});

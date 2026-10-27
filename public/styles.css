@@ -562,6 +562,76 @@ h1 > span { color: #7d9170; }
 .priority-item h3 { margin-bottom: 5px; color: #5b704f; font-size: 13px; font-weight: 600; }
 .priority-item p { color: #89957d; font-size: 13px; line-height: 1.9; }
 
+/* 好词好句训练：把批改结果里真正出现过的表达，变成能写出来的肌肉记忆。 */
+.drill-section { margin-top: 16px; }
+.drill-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px 26px;
+  padding: 22px 24px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  box-shadow: var(--shadow);
+}
+.drill-copy .eyebrow { margin-bottom: 5px; font-size: 11px; }
+.drill-copy h2 { color: var(--ink); font-size: 18px; font-weight: 600; letter-spacing: -.4px; }
+.drill-copy p { max-width: 560px; margin-top: 7px; color: #929a8c; font-size: 13px; line-height: 1.85; }
+.drill-metrics { display: flex; align-items: center; gap: 24px; }
+.drill-metrics > div { display: flex; flex-direction: column; gap: 2px; min-width: 62px; }
+.drill-metrics strong { color: #4c6350; font-family: var(--font-essay); font-size: 21px; font-weight: 500; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.drill-metrics span { color: #a0a894; font-size: 11px; }
+.drill-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
+.drill-empty { grid-column: 1 / -1; margin: 0; color: #a0a894; font-size: 12px; }
+.drill-session-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 9px; color: #97a08f; font-size: 12px; }
+.drill-session-top .card-tag { margin-bottom: 0; }
+.drill-progress { height: 4px; overflow: hidden; background: #e9eee2; border-radius: 99px; }
+.drill-progress > span { display: block; height: 100%; background: var(--green); border-radius: 99px; transition: width .28s ease; }
+.drill-instruction { margin: 18px 0 0; color: #77866d; font-size: 13px; }
+.drill-sentence {
+  margin: 12px 0 10px;
+  padding: 16px 18px;
+  color: #33493a;
+  background: #f7faf3;
+  border: 1px solid #e3ebdb;
+  border-left: 3px solid #b9cf9f;
+  border-radius: 8px;
+  font-family: var(--font-essay);
+  font-size: 17px;
+  line-height: 1.85;
+  overflow-wrap: anywhere;
+}
+.drill-hint { color: #8b9680; font-size: 13px; line-height: 1.8; }
+.drill-input {
+  width: 100%;
+  margin: 12px 0 10px;
+  padding: 11px 13px;
+  color: var(--ink);
+  background: white;
+  border: 1px solid #d6e0cb;
+  border-radius: 8px;
+  font-family: var(--font-essay);
+  font-size: 16px;
+  line-height: 1.7;
+}
+.drill-input:focus { border-color: #9dba82; box-shadow: 0 0 0 3px #e9f1df; outline: none; }
+.drill-input:read-only { background: #f7f8f3; }
+.drill-session-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.drill-feedback { margin-top: 14px; padding: 13px 15px; border: 1px solid #e3ebd9; border-radius: 8px; background: #f5f8f0; color: #6f7f66; font-size: 13px; line-height: 1.8; }
+.drill-feedback.is-correct { color: #4f6b45; background: #eff6e9; border-color: #d8e6c9; }
+.drill-feedback.is-close { color: #8c7434; background: #fbf5e6; border-color: #efe2c2; }
+.drill-feedback.is-wrong, .drill-feedback.is-revealed { color: #94655a; background: #fbf1ed; border-color: #f0ded7; }
+.drill-feedback p { margin-top: 4px; color: #3d5642; font-family: var(--font-essay); font-size: 15px; overflow-wrap: anywhere; }
+.drill-feedback .drill-detail { color: #7d8b71; font-size: 13px; }
+.drill-summary .eyebrow { font-size: 11px; }
+.drill-summary h3 { margin: 6px 0 13px; color: var(--ink); font-size: 19px; font-weight: 600; }
+.drill-summary > p { margin: 13px 0; color: #8b9680; font-size: 13px; line-height: 1.9; }
+.drill-missed { margin-top: 14px; padding-top: 13px; border-top: 1px solid #eef1e8; }
+.drill-missed h4 { margin-bottom: 8px; color: #7c8a6f; font-size: 12px; font-weight: 600; }
+.drill-missed-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.drill-missed-item .card-tag { margin-bottom: 0; flex-shrink: 0; }
+.drill-missed-item p { color: #3d5642; font-family: var(--font-essay); font-size: 14px; overflow-wrap: anywhere; }
+
 .review-section { padding-top: 35px; }
 .section-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; margin-bottom: 18px; }
 .section-heading .eyebrow { margin-bottom: 5px; font-size: 11px; }
@@ -628,6 +698,10 @@ h1 > span { color: #7d9170; }
 .modal-body h3 { color: #53684c; margin: 18px 0 8px; font-size: 13px; }
 .modal-body h3:first-child { margin-top: 0; }
 .modal-body code { padding: 2px 5px; background: #edf2e7; border-radius: 3px; color: #657b54; font-size: 11px; overflow-wrap: anywhere; }
+.help-path { margin: 10px 0 14px; }
+.help-path code { display: block; padding: 10px 12px; border: 1px solid #e0e7d7; background: #f4f7ee; border-radius: 6px; font-size: 12px; line-height: 1.75; }
+.help-lead { color: #6f7c64; }
+.help-note { margin-top: 15px; padding-top: 12px; border-top: 1px dashed #e2e8d8; font-size: 12px; color: #8d9a80; }
 .modal-body pre { overflow-x: auto; padding: 12px; color: #667e55; background: #eff3e9; border: 1px solid #e0e7d7; border-radius: 6px; font-size: 11px; line-height: 1.8; }
 .about-content h3 { margin-top: 22px; }
 .about-content h3:first-child { margin-top: 0; }
@@ -732,6 +806,9 @@ h1 > span { color: #7d9170; }
   .priority-intro { grid-column: 1 / -1; padding: 0 20px 17px; margin: 0 0 15px; border-bottom: 1px solid #dde5d3; flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 10px; flex-wrap: wrap; }
   .priority-intro .eyebrow { display: none; }
   .priority-item:nth-child(2) { border-left: 0; }
+  .drill-card { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 20px; }
+  .drill-actions { grid-column: auto; }
+  .drill-metrics { justify-content: flex-start; gap: 20px; }
   .review-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 16px; }
   .review-column:last-child { grid-column: 1 / -1; }
   #review-notes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; align-items: start; }
@@ -805,6 +882,12 @@ h1 > span { color: #7d9170; }
   .priority-item { padding: 12px 19px 12px 43px; border: 0; }
   .priority-index { top: 11px; left: 18px; }
   .priority-item h3 { margin-bottom: 3px; font-size: 11px; }
+  .drill-card { padding: 17px; }
+  .drill-metrics { gap: 16px; }
+  .drill-metrics > div { min-width: 0; }
+  .drill-metrics strong { font-size: 18px; }
+  .drill-sentence { padding: 14px 15px; font-size: 16px; }
+  .drill-actions .btn { flex: 1 1 140px; }
   .priority-item p { font-size: 13px; }
   .review-section { padding-top: 27px; }
   .section-heading { align-items: flex-start; gap: 10px; margin-bottom: 17px; }

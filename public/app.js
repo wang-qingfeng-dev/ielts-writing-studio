@@ -4,6 +4,7 @@ import { initLocalAiSetup } from './local-ai-setup.js';
 import { initCloudAiSetup } from './cloud-ai-setup.js';
 import { taskProfile } from './writing-task.js';
 import { initAppUpdates } from './app-updates.js';
+import { initDrill } from './drills.js';
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -184,6 +185,7 @@ function renderAnalysis() {
   cloudAiSetup?.updateControls();
   renderPriorities();
   renderReview();
+  drill?.render();
 }
 function renderModel() {
   const a = state.analysis;
@@ -302,6 +304,16 @@ taskImageRecognize?.addEventListener('click', async () => {
   reader.readAsDataURL(taskImage);
 });
 $('#provider-select').addEventListener('change', event=>{ selectProvider(event.target.value); });
+$('#modal-root').addEventListener('click', async event => {
+  const action = event.target.closest('[data-workbuddy-help]')?.dataset.workbuddyHelp;
+  if (!action) return;
+  if (action === 'copy') {
+    const shown = $('#modal-root .help-path code')?.textContent || '';
+    toast(await copyToClipboard(shown) ? '路径已复制，粘贴到文件资源管理器的地址栏就能打开。' : `请手动打开：${shown}`);
+    return;
+  }
+  if (action === 'recheck') await recheckWorkbuddy(event.target.closest('[data-workbuddy-help]'));
+});
 window.addEventListener('pagehide', saveDraft);
 
 async function selectProvider(next) {
@@ -325,6 +337,13 @@ async function checkConnection() {
     if (requestId !== connectionRequest) return;
     connection = result;
     updateProviderControls(connection);
+    // WorkBuddy 的登录检查在后台进行，先给出“正在检查”，不要把检查中误显示成未连接。
+    if (result.pending) {
+      el.innerHTML = '<span class="status-dot"></span>正在检查 WorkBuddy…';
+      el.title = result.message || '';
+      setTimeout(() => { if (requestId === connectionRequest) checkConnection(); }, 9000);
+      return;
+    }
     const engine = String(connection.engine || '当前 AI').replace(/\s+/gu, ' ').trim();
     const label = `${connection.available ? '已连接' : '未连接'} · ${engine}`.replace(/[&<>"']/gu, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[character]);
     el.innerHTML = `<span class="status-dot ${connection.available?'':'offline'}"></span>${label}`;
@@ -333,17 +352,18 @@ async function checkConnection() {
 }
 async function switchProvider(next) {
   if (state.busy || providerSwitching || cloudAiBusy) return;
-  if (!['auto','ollama','codex','openai-compatible'].includes(next)) return;
+  if (!['auto','ollama','codex','workbuddy','openai-compatible'].includes(next)) return;
   providerSwitching = true; $('#provider-select').disabled = true; $('#analyze-button').disabled = true;
   ++connectionRequest;
   try {
-    const response = await fetch('/api/provider',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider:next}),signal:AbortSignal.timeout(12000)});
+    const response = await fetch('/api/provider',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider:next}),signal:AbortSignal.timeout(next==='workbuddy'?75000:12000)});
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || '切换 AI 模式失败。');
     connection = {...result,checked:true};
     providerInfo = result; updateProviderControls(result);
-    const label = result.provider === 'ollama' ? '本地 AI' : result.provider === 'codex' ? 'Codex' : result.engine || '所选 AI';
+    const label = result.provider === 'ollama' ? '本地 AI' : result.provider === 'codex' ? 'Codex' : result.provider === 'workbuddy' ? 'WorkBuddy' : result.engine || '所选 AI';
     toast(`已切换到 ${label}。${result.available?'可以开始分析。':result.message || '当前模式尚未连接。'}`);
+    if (result.provider === 'workbuddy' && !result.available) openWorkbuddyHelp(result);
     const el=$('#connection-status');
     const engine = String(result.engine || '当前 AI').replace(/\s+/gu, ' ').trim();
     const statusLabel = `${result.available ? '已连接' : '未连接'} · ${engine}`.replace(/[&<>"']/gu, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[character]);
@@ -354,6 +374,57 @@ async function switchProvider(next) {
     await checkConnection();
   }
   finally { providerSwitching = false; updateProviderControls(); renderAnalysis(); }
+}
+function applyConnectionStatus(result) {
+  const el = $('#connection-status');
+  if (!el) return;
+  const engine = String(result.engine || '当前 AI').replace(/\s+/gu, ' ').trim();
+  const label = `${result.available ? '已连接' : '未连接'} · ${engine}`.replace(/[&<>"']/gu, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[character]);
+  el.innerHTML = `<span class="status-dot ${result.available ? '' : 'offline'}"></span>${label}`;
+  el.title = result.message || '';
+}
+async function copyToClipboard(text) {
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch {
+    try {
+      const area = document.createElement('textarea');
+      area.value = text;
+      area.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+      document.body.append(area);
+      area.select();
+      const ok = document.execCommand('copy');
+      area.remove();
+      return ok;
+    } catch { return false; }
+  }
+}
+// WorkBuddy 未登录时，与其让用户去猜命令，不如直接把“双击哪个文件、点哪里”写在弹窗里。
+function openWorkbuddyHelp(info) {
+  const script = info.loginScript || '';
+  // 有登录脚本时，服务端那句“去运行 node …”和下面的步骤重复，只保留步骤。
+  const intro = !script && info.message ? `<p>${e(info.message)}</p>` : '';
+  const where = script
+    ? `<p class="help-lead">双击下面这个文件，它和 <code>Start Writing Studio.cmd</code> 在同一个文件夹：</p><p class="help-path"><code>${e(script)}</code></p>`
+    : `<p class="help-lead">在这台电脑的终端里运行 <code>codebuddy</code>，然后输入 <code>/login</code>。</p>`;
+  const steps = '<ol><li>等黑窗口出现可以打字的输入框</li><li>输入 <code>/login</code> 并按回车</li><li>浏览器打开授权页，登录你的账号并点「允许」</li><li>回到黑窗口，最后显示 <code>OK</code> 就成功了</li></ol>';
+  const footer = `${script ? '<button class="btn btn-secondary" type="button" data-workbuddy-help="copy">复制文件路径</button>' : ''}<button class="btn btn-primary" type="button" data-workbuddy-help="recheck">我已登录，重新检查</button>`;
+  openModal('连接 WorkBuddy 只需要登录一次', `${intro}${where}${steps}<p class="help-note">登录只需要做一次。之后用的是这台电脑上 WorkBuddy 已登录账号的额度，不需要另外买 API 密钥。</p>`, footer);
+}
+async function recheckWorkbuddy(button) {
+  if (button) button.disabled = true;
+  try {
+    const response = await fetch('/api/provider?refresh=1', { signal: AbortSignal.timeout(75000) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || '检查失败');
+    connection = { ...result, checked: true };
+    providerInfo = result;
+    updateProviderControls(result);
+    applyConnectionStatus(result);
+    if (result.available) { closeModal(); toast('WorkBuddy 已登录，可以开始分析了。'); }
+    else toast(result.message || '还没有检测到登录，请确认黑窗口里已经完成 /login。');
+  } catch (error) {
+    toast(error.name === 'TimeoutError' ? '检查超时了，请稍后再点一次。' : error.message || '检查失败，请稍后再试。');
+  } finally { if (button) button.disabled = false; }
 }
 function showError(message) { $('#error').textContent = message; $('#error').classList.remove('hidden'); $('#error').scrollIntoView({behavior:'smooth',block:'center'}); }
 async function analyze() {
@@ -499,7 +570,7 @@ function exportNotes() {
   toast('学习笔记已导出，包含三篇作文、评分和复习内容。');
 }
 function showAbout() {
-  openModal('写作工作台 · 使用与评分说明',`<div class="about-content"><h3>一次练习，走完一个学习闭环</h3><ol><li>选择题型并粘贴完整题目。Task 1 建议 20 分钟、150 词；Task 2 建议 40 分钟、250 词。学术类 Task 1 还需填写原图数据或流程/地图描述。</li><li>点击「开始分析」，先看三个重点，再点击原文和精修版的高亮。</li><li>中栏保留观点做必要修改；右栏只根据题目独立创作，可按需展开。</li><li>收藏常犯错误和好表达，通过换题造句与间隔复习形成记忆。</li></ol><h3>评分怎么看</h3><p>Task 1 使用任务完成度 TA，Task 2 使用任务回应 TR；其余三项为连贯与衔接 CC、词汇资源 LR、语法多样性与准确性 GRA。单篇四项等权，展示 AI 参考区间与文本证据。</p><p>这是练习估分，不能替代正式考试结果。语法修正不一定改善论证，范文也不会自动获得满分。这里评估单篇作文，不计算整场 Writing 总成绩。</p><h3>关于保存与 AI</h3><p>草稿、最近 30 篇练习和复习卡保存在当前浏览器。清除浏览器数据会移除这些记录，请通过「导出学习笔记」备份。</p><p>本地 Ollama 在你的电脑上分析作文；在线 AI 会将题目和作文发送给所选服务商，使用你的账户额度。在线设置中输入的 API 密钥只保存在本机应用配置，不写入练习记录，可以随时删除。Codex 模式使用本机已有配置。示例为预设内容，服务失败时不会拿示例冒充分析结果。</p><p>小练习的答案对照与搭配检查为本地检查；「用上了搭配」不代表整句语法已通过 AI 审核。</p><a href="https://ielts.org/take-a-test/your-results/ielts-scoring-in-detail" target="_blank" rel="noopener noreferrer">查看 IELTS 官方评分说明 ↗</a></div>`);
+  openModal('写作工作台 · 使用与评分说明',`<div class="about-content"><h3>一次练习，走完一个学习闭环</h3><ol><li>选择题型并粘贴完整题目。Task 1 建议 20 分钟、150 词；Task 2 建议 40 分钟、250 词。学术类 Task 1 还需填写原图数据或流程/地图描述。</li><li>点击「开始分析」，先看三个重点，再点击原文和精修版的高亮。</li><li>中栏保留观点做必要修改；右栏只根据题目独立创作，可按需展开。</li><li>收藏常犯错误和好表达，通过换题造句与间隔复习形成记忆。</li><li>做完批改后点「开始训练」：系统会用这篇作文里的真实好词好句出 11 道填空、中译英和改错题，答完即时判分，错题可以只练那几道。</li></ol><h3>评分怎么看</h3><p>Task 1 使用任务完成度 TA，Task 2 使用任务回应 TR；其余三项为连贯与衔接 CC、词汇资源 LR、语法多样性与准确性 GRA。单篇四项等权，展示 AI 参考区间与文本证据。</p><p>这是练习估分，不能替代正式考试结果。语法修正不一定改善论证，范文也不会自动获得满分。这里评估单篇作文，不计算整场 Writing 总成绩。</p><h3>关于保存与 AI</h3><p>草稿、最近 30 篇练习和复习卡保存在当前浏览器。清除浏览器数据会移除这些记录，请通过「导出学习笔记」备份。</p><p>本地 Ollama 在你的电脑上分析作文；在线 AI 会把题目和作文发送给所选服务商，使用你的账户额度。在线设置中输入的 API 密钥只保存在本机应用配置，不写入练习记录，可以随时删除。Codex 与 WorkBuddy 模式使用本机命令行已登录的账号额度，不需要再填 API 密钥。在线列表里排在前面的是有免费额度的服务，但都需要在服务商网站注册并实名，免费规则以对方当前公告为准。示例为预设内容，服务失败时不会拿示例冒充分析结果。</p><p>小练习的答案对照与搭配检查为本地检查；「用上了搭配」不代表整句语法已通过 AI 审核。</p><a href="https://ielts.org/take-a-test/your-results/ielts-scoring-in-detail" target="_blank" rel="noopener noreferrer">查看 IELTS 官方评分说明 ↗</a></div>`);
 }
 
 document.addEventListener('click', async event=>{
@@ -579,6 +650,10 @@ document.addEventListener('keydown',event=>{
   if(event.target.classList.contains('mobile-tab') && ['ArrowLeft','ArrowRight'].includes(event.key)){
     event.preventDefault();const tabs=['original','corrected','model'];const index=tabs.indexOf(state.activeTab);const next=tabs[(index+(event.key==='ArrowRight'?1:2))%3];setMobileTab(next);$(`[data-tab="${next}"]`).focus();
   }
+});
+const drill = initDrill({
+  getState: () => ({ analysis: state.analysis, essay: state.essay, busy: state.busy || localAiBusy || cloudAiBusy }),
+  openModal, closeModal, toast,
 });
 renderAll();
 setMobileTab('original');

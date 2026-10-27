@@ -1,6 +1,6 @@
 # IELTS Writing Studio · 句进
 
-> v0.2.0 adds Academic/General Task 1, guided domestic API setup, Windows installer updates, and Mac arm64/x64 packages. See [release notes](docs/release-notes-v0.2.0.md).
+> v0.4.0 adds expression drills built from your own essay, a WorkBuddy CLI provider that uses your existing WorkBuddy account, and free-tier presets (Zhipu GLM Flash, Hunyuan lite, Doubao quota). Source changes are not packaged yet; the installer is still v0.3.0.
 
 [简体中文](README.md) · [Download v0.2.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.2.0) · [Changelog](CHANGELOG.md)
 

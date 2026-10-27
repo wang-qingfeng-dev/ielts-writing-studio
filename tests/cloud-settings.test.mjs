@@ -16,7 +16,17 @@ test('预设填入官方地址与默认模型，硅基流动必须填写账号�
   assert.deepEqual(validateCloudSettings(config), { provider: 'deepseek', baseUrl: 'https://api.deepseek.com', model: 'deepseek-flash', apiKey: config.apiKey });
   assert.equal(validateCloudSettings({ provider: 'openrouter', apiKey: 'test-key' }).model, 'openrouter/free');
   assert.throws(() => validateCloudSettings({ provider: 'siliconflow', apiKey: 'test-key' }), /模型名称/);
-  assert.deepEqual(CLOUD_PRESETS.map(item=>item.id).sort(), ['deepseek','doubao','hunyuan','siliconflow','openrouter','custom'].sort());
+  assert.deepEqual(CLOUD_PRESETS.map(item=>item.id).sort(), ['deepseek','doubao','hunyuan','siliconflow','openrouter','glm','custom'].sort());
+});
+
+test('有免费额度的服务排在前面，并带着免费说明', () => {
+  const preset = validateCloudSettings({ provider: 'glm', apiKey: 'test-key' });
+  assert.equal(preset.baseUrl, 'https://open.bigmodel.cn/api/paas/v4');
+  assert.equal(preset.model, 'glm-4.7-flash');
+  assert.ok(CLOUD_PRESETS.filter(item => item.free).length >= 4, '至少四个服务有免费档或免费额度');
+  assert.equal(CLOUD_PRESETS[0].id, 'glm', '默认选项应当是可以免费使用的服务');
+  assert.ok(CLOUD_PRESETS.every(item => typeof item.free === 'boolean'));
+  assert.ok(publicCloudSettings(null).providers.every(item => 'freeNote' in item || !item.free));
 });
 
 test('云端必须 HTTPS，固定预设不能偷偷修改地址，本机兼容接口可免密钥', () => {

@@ -42,7 +42,7 @@ export function initCloudAiSetup(options = {}) {
       byId('cloud-ai-summary').textContent = `已保存 ${label} · ${config.model}。在线批改不需要下载模型，使用你的服务商账户额度；可在设置中切换服务或删除连接。`;
       openButton.textContent = '管理在线 AI ↗';
     } else {
-      byId('cloud-ai-summary').textContent = '不用下载模型。选择服务商，粘贴一次自己的 API 密钥，即可联网批改。免费额度与收费以服务商当前规则为准。';
+      byId('cloud-ai-summary').textContent = '不用下载模型。选一个列出“免费”的服务（智谱 GLM Flash、豆包、混元 lite 等），粘贴一次自己的 API 密钥即可联网批改；额度与收费以服务商当前规则为准。';
       openButton.textContent = '设置在线 AI ↗';
     }
   }
@@ -65,13 +65,14 @@ export function initCloudAiSetup(options = {}) {
     baseInput.readOnly = !custom;
     byId('cloud-advanced').open = custom || !modelInput.value;
     byId('cloud-provider-steps').textContent = preset?.setupHint || '点击下方按钮登录官方平台 → 创建并复制 API 密钥 → 回到本窗口粘贴 → 点击“连接并使用”。只需首次设置，以后直接在写作页面分析。';
-    byId('cloud-provider-pricing').textContent = preset?.pricingNote || '费用、额度与可用模型由你选择的服务商决定。软件不提供共享 API 密钥或无限免费额度。';
+    const pricing = preset?.pricingNote || '费用、额度与可用模型由你选择的服务商决定。软件不提供共享 API 密钥或无限免费额度。';
+    byId('cloud-provider-pricing').textContent = preset?.free ? `【可免费使用 · ${preset.freeNote || '有免费额度'}】${pricing}` : pricing;
     const link = byId('cloud-provider-signup');
     let signupUrl = null;
     try { const url = new URL(preset?.signupUrl); if (url.protocol === 'https:') signupUrl = url.href; } catch { /* 自定义服务不提供注册链接。 */ }
     link.classList.toggle('hidden', !signupUrl);
     link.href = signupUrl || '#';
-    link.textContent = signupUrl ? `登录 ${preset.label} · 获取密钥 ↗` : '请使用你信任的服务商控制台';
+    link.textContent = signupUrl ? `登录 ${preset.label.split(' · ')[0]} · 获取密钥 ↗` : '请使用你信任的服务商控制台';
     keyInput.value = '';
     consentInput.checked = false;
     updateKeyHint();
@@ -80,14 +81,30 @@ export function initCloudAiSetup(options = {}) {
     config = result;
     const presets = Array.isArray(config.providers) ? config.providers : [];
     providerInput.replaceChildren();
-    for (const preset of presets) {
-      const option = document.createElement('option');
-      option.value = preset.id;
-      option.textContent = preset.label;
-      providerInput.append(option);
+    // 先用免费档跑通流程，再决定是否付费：把有免费额度的服务放在最前面。
+    const groups = [
+      { label: '可以用免费额度（仍需自己的密钥）', items: presets.filter(item => item.free) },
+      { label: '按量付费', items: presets.filter(item => !item.free && item.id !== 'custom') },
+    ];
+    for (const group of groups) {
+      if (!group.items.length) continue;
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = group.label;
+      for (const preset of group.items) {
+        const option = document.createElement('option');
+        option.value = preset.id;
+        option.textContent = preset.label;
+        optgroup.append(option);
+      }
+      providerInput.append(optgroup);
     }
     if (!presets.some(item => item.id === 'custom')) {
-      const option = document.createElement('option'); option.value = 'custom'; option.textContent = '其他兼容服务（自定义）'; providerInput.append(option);
+      const custom = document.createElement('option'); custom.value = 'custom'; custom.textContent = '其他兼容接口（自定义）'; providerInput.append(custom);
+    } else {
+      const option = document.createElement('option');
+      option.value = 'custom';
+      option.textContent = '其他兼容接口（自定义）';
+      providerInput.append(option);
     }
     providerInput.value = presets.some(item => item.id === config.provider) || config.provider === 'custom' ? config.provider : presets[0]?.id || 'custom';
     showProvider(Boolean(config.configured || config.keyConfigured));

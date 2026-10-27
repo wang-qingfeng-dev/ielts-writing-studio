@@ -1,11 +1,12 @@
 import http from 'node:http';
 import { spawn } from 'node:child_process';
-import { readFile, writeFile, mkdtemp, rm, realpath, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdtemp, rm, realpath, mkdir, stat } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { correctionSchema, modelSchema, validateCorrection, validateModel, validateAnalysis, validateRequest, ValidationError } from './analysis-schema.mjs';
-import { resolveProvider, getProviderStatus, setProviderOverride, getProviderOverride, completeJson, completeVisionJson, ProviderError, setCloudConfig } from './provider.mjs';
+import { resolveProvider, getProviderStatus, setProviderOverride, getProviderOverride, completeJson, completeVisionJson, assertOllamaModel, ProviderError, setCloudConfig, workbuddyModel, workbuddyModelLabel } from './provider.mjs';
 import { createLocalAIManager } from './local-ai.mjs';
 import { normalizeCorrection, normalizeModel } from './analysis-normalization.mjs';
 import { generateLocalModel } from './local-model.mjs';
@@ -34,10 +35,10 @@ function killChild(child) {
     killer.on('error', () => child.kill());
   } else child.kill('SIGKILL');
 }
-function runProcess(command, args, { cwd, input = '', signal, timeout = ANALYSIS_TIMEOUT, maxOutput = 4 * 1024 * 1024 } = {}) {
+function runProcess(command, args, { cwd, input = '', signal, timeout = ANALYSIS_TIMEOUT, maxOutput = 4 * 1024 * 1024, env, spawnError } = {}) {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(new HttpError(499, '本次分析已取消。'));
-    const child = spawn(command, args, { cwd, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn(command, args, { cwd, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'], env: env || process.env });
     let stdout = '', stderr = '', settled = false;
     const finish = (error, value) => { if (settled) return; settled = true; clearTimeout(timer); signal?.removeEventListener('abort', abort); error ? reject(error) : resolve(value); };
     const abort = () => { killChild(child); finish(new HttpError(499, '本次分析已取消。')); };
@@ -45,7 +46,7 @@ function runProcess(command, args, { cwd, input = '', signal, timeout = ANALYSIS
     signal?.addEventListener('abort', abort, { once: true });
     child.stdout.on('data', data => { stdout += data.toString(); if (stdout.length > maxOutput) { killChild(child); finish(new HttpError(502, '分析输出超出限制，请缩短作文后重试。')); } });
     child.stderr.on('data', data => { if (stderr.length < 32000) stderr += data.toString(); });
-    child.on('error', () => finish(new HttpError(503, '未找到可用的 Codex，请安装并登录后重试。')));
+    child.on('error', () => finish(new HttpError(503, spawnError || '未找到可用的 Codex，请安装并登录后重试。')));
     child.on('close', code => finish(null, { code, stdout, stderr }));
     child.stdin.on('error', () => {});
     child.stdin.end(input);
@@ -80,10 +81,207 @@ export async function getCodexStatus() {
     return { available, engine: `Codex CLI · ${model}`, message: available ? '已连接当前电脑的 Codex，支持真实作文分析。' : 'Codex CLI 已找到，但当前未登录。请运行 codex login 后刷新连接。' };
   } catch { return { available: false, engine: `Codex CLI · ${model}`, message: '未找到 Codex CLI。请确认 Codex 已安装，或设置 IELTS_CODEX_PATH 后重启软件。' }; }
 }
-export async function getEngineStatus() {
+export async function getEngineStatus({ wait = true, refresh = false } = {}) {
   const status = await getProviderStatus();
-  if (status.provider !== 'codex') return status;
-  return { ...await getCodexStatus(), provider:'codex', selected:getProviderOverride() };
+  if (status.provider === 'codex') return { ...await getCodexStatus(), provider:'codex', selected:getProviderOverride() };
+  if (status.provider === 'workbuddy') return { ...await getWorkbuddyStatus({ wait, refresh }), provider:'workbuddy', selected:getProviderOverride(), loginScript: workbuddyLoginScript() };
+  return status;
+}
+
+// WorkBuddy 桌面版自带 codebuddy 命令行（与 Codex CLI 同类的非交互模式）。
+// 复用本机已登录的账号额度，因此不需要 API 密钥，也不按 token 向服务商付费。
+const CODEBUDDY_BIN_NAMES = ['codebuddy', 'cbc', 'codebuddy-code'];
+
+function workbuddyRoots() {
+  const roots = [];
+  const add = value => { if (value && !roots.includes(value)) roots.push(value); };
+  add(process.env.WORKBUDDY_HOME?.trim());
+  const parents = [
+    process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Programs') : '',
+    process.env.ProgramFiles || '',
+    process.env['ProgramFiles(x86)'] || '',
+  ].filter(Boolean);
+  for (const parent of parents) for (const name of ['WorkBuddy', 'WorkBuddy AI', 'CodeBuddy']) add(path.join(parent, name));
+  // 有些用户把软件装在非系统盘的自定义目录，这里只做少量固定位置的探测，避免全盘扫描。
+  for (const drive of ['C:', 'D:', 'E:', 'F:']) {
+    for (const relative of ['Software\\WorkBuddyAI', 'Software\\WorkBuddy', 'WorkBuddy', 'Program Files\\WorkBuddy']) add(`${drive}\\${relative}`);
+  }
+  return roots;
+}
+
+async function findWorkbuddyCli() {
+  const explicit = process.env.IELTS_WORKBUDDY_PATH?.trim();
+  if (explicit) return explicit;
+  const locator = process.platform === 'win32' ? 'where.exe' : 'which';
+  for (const name of CODEBUDDY_BIN_NAMES) {
+    try {
+      const result = await runProcess(locator, [name], { timeout: 2500, maxOutput: 8000 });
+      const candidate = result.stdout.split(/\r?\n/u).map(line => line.trim()).find(Boolean);
+      // .cmd/.bat 包装脚本需要 shell 才能启动；优先使用真正的 JS 启动文件。
+      if (result.code === 0 && candidate && !/\.(?:cmd|bat)$/i.test(candidate)) return candidate;
+    } catch { /* 继续尝试安装目录。 */ }
+  }
+  for (const root of workbuddyRoots()) {
+    for (const name of ['codebuddy', 'cbc']) {
+      const candidate = path.join(root, 'resources', 'app.asar.unpacked', 'cli', 'bin', name);
+      try { if ((await stat(candidate)).isFile()) return candidate; } catch { /* 该目录没有 WorkBuddy。 */ }
+    }
+  }
+  return '';
+}
+
+// codebuddy 启动文件是带 node shebang 的脚本；Windows 下必须用 node 执行。
+async function cliLaunch(file) {
+  if (/\.(?:mjs|cjs|js)$/i.test(file)) return { command: process.execPath, args: [file] };
+  try {
+    const info = await stat(file);
+    if (info.isFile() && info.size < 131072) {
+      const firstLine = (await readFile(file, 'utf8')).split(/\r?\n/u)[0] || '';
+      if (firstLine.startsWith('#!') && /node/iu.test(firstLine)) return { command: process.execPath, args: [file] };
+    }
+  } catch { /* 交给 spawn 返回可操作的错误。 */ }
+  return { command: file, args: [] };
+}
+
+// 代理变量会让 WorkBuddy 命令行在启动阶段报 setProxy 错误，这里按官方启动器的做法清掉。
+function workbuddyEnv() {
+  const env = { ...process.env, NO_COLOR: '1' };
+  for (const key of ['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'http_proxy', 'https_proxy', 'all_proxy', 'npm_config_proxy', 'npm_config_https_proxy']) delete env[key];
+  env.NO_PROXY = '*'; env.no_proxy = '*';
+  return env;
+}
+
+// 0 表示让系统分配空闲端口，避免与 WorkBuddy 桌面版或上一次会话的固定端口冲突。
+function workbuddyPort() { return 0; }
+
+// 项目自带的登录脚本；打包版可能没有，返回空字符串让页面只给文字步骤。
+export function workbuddyLoginScript() {
+  const script = path.join(ROOT, 'Login WorkBuddy.cmd');
+  return existsSync(script) ? script : '';
+}
+
+function workbuddyArgs({ schema, model, port, prompt }) {
+  const args = ['-p', '--output-format', 'json', '--tools', '', '--permission-mode', 'dontAsk',
+    '--no-session-persistence', '--port', String(port), '--json-schema', JSON.stringify(schema)];
+  if (model) args.push('--model', model);
+  if (prompt) args.push(prompt);
+  return args;
+}
+
+// 给出一条可以直接复制的登录命令，避免用户只看到“codebuddy”却不知道在哪运行。
+function workbuddyCommandHint(file) {
+  if (!file) return 'codebuddy';
+  if (/\.(?:mjs|cjs|js)$/iu.test(file) || /(?:^|[\\/])(?:codebuddy|cbc)$/iu.test(file)) return `node "${file}"`;
+  return `"${file}"`;
+}
+
+function workbuddyFailure(detail, file = '') {
+  if (/authentication required|not logged in|please use\s*\/login|unauthorized|invalid api key/i.test(detail)) {
+    const script = workbuddyLoginScript();
+    // 有登录脚本时直接指路，别让人去抄一长串 node 命令。
+    if (script) return new HttpError(503, `WorkBuddy 还没有登录。请双击 ${script}，在打开的窗口里输入 /login 完成一次登录，然后回到页面点「我已登录，重新检查」。`);
+    return new HttpError(503, `WorkBuddy 命令行还没有登录。请在这台电脑打开 PowerShell 运行 ${workbuddyCommandHint(file)}，输入 /login 完成一次登录，然后回到页面重试。`);
+  }
+  if (/ENOENT|spawn .* ENOENT|command not found/i.test(detail)) {
+    return new HttpError(503, '找不到 WorkBuddy 命令行。请确认 WorkBuddy 已安装；如果装在非默认目录，请把环境变量 IELTS_WORKBUDDY_PATH 指向 resources/app.asar.unpacked/cli/bin/codebuddy 后重启软件。');
+  }
+  return null;
+}
+
+export function parseWorkbuddyOutput(stdout) {
+  const text = String(stdout || '').trim();
+  if (!text) throw new ValidationError('WorkBuddy returned no output');
+  const plainFailure = workbuddyFailure(text);
+  if (plainFailure) throw plainFailure;
+  const lines = text.split(/\r?\n/u);
+  let envelope = null;
+  for (let index = lines.length - 1; index >= 0 && !envelope; index--) {
+    const line = lines[index].trim();
+    if (!line.startsWith('{') || !line.endsWith('}')) continue;
+    try { envelope = JSON.parse(line); } catch { /* 混在日志里的片段。 */ }
+  }
+  if (!envelope) {
+    const start = text.indexOf('{'), end = text.lastIndexOf('}');
+    if (start < 0 || end <= start) throw new ValidationError('WorkBuddy output was not JSON');
+    try { envelope = JSON.parse(text.slice(start, end + 1)); }
+    catch { throw new ValidationError('WorkBuddy output was not valid JSON'); }
+  }
+  if (envelope.is_error || envelope.subtype === 'error') {
+    const detail = String(envelope.result ?? envelope.error ?? '').replace(/\s+/gu, ' ').slice(0, 200);
+    throw workbuddyFailure(detail) || new HttpError(502, `WorkBuddy 返回错误：${detail || '未知原因'}`);
+  }
+  const payload = envelope.structured_output ?? envelope.structuredOutput ?? envelope.result ?? envelope.data?.result;
+  if (typeof payload === 'string') {
+    const clean = payload.trim().replace(/^```(?:json)?\s*/iu, '').replace(/\s*```$/u, '');
+    try { return JSON.parse(clean); } catch { throw new ValidationError('WorkBuddy result was not valid JSON'); }
+  }
+  if (payload && typeof payload === 'object') return payload;
+  // 有些版本会把结构化结果直接打印出来，没有 result/structured_output 包装。
+  if (envelope.originalScore || envelope.corrected || envelope.model) return envelope;
+  throw new ValidationError('WorkBuddy result was empty');
+}
+
+async function runWorkbuddy({ schema, prompt, workDir, signal, timeout = ANALYSIS_TIMEOUT }) {
+  const file = await findWorkbuddyCli();
+  if (!file) {
+    throw new HttpError(503, '未找到 WorkBuddy 命令行。请先安装 WorkBuddy 桌面版；装在其他目录时，请用环境变量 IELTS_WORKBUDDY_PATH 指定 codebuddy 启动文件后重启软件。');
+  }
+  const launch = await cliLaunch(file);
+  // 超长提示改用标准输入，避免 Windows 命令行长度上限。
+  const viaStdin = prompt.length > 24000;
+  let lastError = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const args = [...launch.args, ...workbuddyArgs({ schema, model: workbuddyModel(), port: workbuddyPort(), prompt: viaStdin ? '' : prompt })];
+    const execution = await runProcess(launch.command, args, { cwd: workDir, input: viaStdin ? prompt : '', signal, timeout, env: workbuddyEnv(), spawnError: '未找到 WorkBuddy 命令行。请确认 WorkBuddy 已安装；如果装在非默认目录，请把环境变量 IELTS_WORKBUDDY_PATH 指向 resources/app.asar.unpacked/cli/bin/codebuddy 后重启软件。' });
+    const output = `${execution.stderr}\n${execution.stdout}`;
+    if (/EADDRINUSE/i.test(output)) {
+      lastError = new HttpError(503, 'WorkBuddy 命令行端口被占用，请重新点击分析。');
+      continue;
+    }
+    // WorkBuddy 在未登录时依然以退出码 0 结束，只把原因写到 stderr，必须先看输出。
+    const failure = workbuddyFailure(output, file);
+    if (failure) throw failure;
+    if (execution.code !== 0) throw new HttpError(502, `WorkBuddy 分析失败（退出码 ${execution.code}）。请确认命令行可以正常启动后重试。`);
+    if (!execution.stdout.trim()) throw new HttpError(502, 'WorkBuddy 没有返回任何结果。请先在终端运行 codebuddy 并输入 /login 登录，再重试。');
+    return parseWorkbuddyOutput(execution.stdout);
+  }
+  throw lastError || new HttpError(502, 'WorkBuddy 分析失败，请重试。');
+}
+
+let workbuddyStatusCache = { at: 0, value: null };
+let workbuddyProbe = null;
+
+async function probeWorkbuddy() {
+  const model = workbuddyModel();
+  const engine = `WorkBuddy CLI · ${workbuddyModelLabel(model)}`;
+  const remember = value => { workbuddyStatusCache = { at: Date.now(), value }; return value; };
+  const file = await findWorkbuddyCli();
+  if (!file) {
+    return remember({ available:false, engine:'WorkBuddy CLI', message:'未找到 WorkBuddy 命令行。请先安装 WorkBuddy 桌面版；装在其他目录时，用环境变量 IELTS_WORKBUDDY_PATH 指定 codebuddy 启动文件后重启软件。' });
+  }
+  try {
+    const launch = await cliLaunch(file);
+    const execution = await runProcess(launch.command, [...launch.args, '-p', '--output-format', 'json', '--tools', '', '--permission-mode', 'dontAsk', '--no-session-persistence', '--port', String(workbuddyPort()), 'Reply with OK and nothing else.'], { timeout: 60000, maxOutput: 262144, env: workbuddyEnv(), spawnError: '无法启动 WorkBuddy 命令行。请确认安装完整，或用环境变量 IELTS_WORKBUDDY_PATH 指定 codebuddy 启动文件。' });
+    const output = `${execution.stderr}\n${execution.stdout}`;
+    const failure = workbuddyFailure(output, file);
+    if (failure) return remember({ available:false, engine, message: failure.message });
+    if (execution.code !== 0 || !execution.stdout.trim()) {
+      return remember({ available:false, engine, message: `WorkBuddy 命令行已找到，但这次检查没有通过：${(execution.stderr || execution.stdout || '').replace(/\s+/gu, ' ').slice(0, 160) || '没有返回结果，请先完成登录'}。` });
+    }
+    return remember({ available:true, engine, message:`已连接 WorkBuddy（${workbuddyModelLabel(model)}）。使用这台电脑上 WorkBuddy 已登录账号的额度，不需要 API 密钥。` });
+  } catch (error) {
+    if (error instanceof HttpError) return remember({ available:false, engine, message:error.message });
+    return remember({ available:false, engine, message:'无法启动 WorkBuddy 命令行，请确认安装完整后重试。' });
+  }
+}
+
+// wait=false 时先返回已有结果并在后台检查，避免页面顶部的状态栏被一次登录探测拖慢。
+export async function getWorkbuddyStatus({ wait = true, refresh = false } = {}) {
+  if (refresh) workbuddyStatusCache = { at: 0, value: null };
+  if (workbuddyStatusCache.value && Date.now() - workbuddyStatusCache.at < 300000) return workbuddyStatusCache.value;
+  if (!workbuddyProbe) workbuddyProbe = probeWorkbuddy().finally(() => { workbuddyProbe = null; });
+  if (wait) return workbuddyProbe;
+  return workbuddyStatusCache.value || { available:false, engine:'WorkBuddy CLI', pending:true, message:'正在检查 WorkBuddy 命令行与登录状态…' };
 }
 
 // 只读取配置中的区段名称来停用集成；绝不解析或记录凭据。
@@ -146,8 +344,13 @@ export async function analyzeWriting(input, { signal } = {}) {
   const tempRoot = path.join(os.tmpdir(), 'ielts-writing-studio');
   await mkdir(tempRoot, { recursive: true });
   const workDir = await mkdtemp(path.join(tempRoot, 'analysis-'));
+  let provider = null;
+  // 失败时告诉用户是哪套 AI 在报错，否则「分析不了」无法自查。
+  const engineNote = () => (provider ? `当前使用：${provider.name} · ${provider.modelLabel || provider.model}。` : '');
   try {
-    const provider = await resolveProvider();
+    provider = await resolveProvider();
+    // 本地模式先确认模型真的存在，避免用户只看到无从下手的分析失败。
+    if (provider.kind === 'ollama') await assertOllamaModel(provider, controller.signal);
     const extra = provider.kind === 'codex' ? await integrationOverrides() : [];
     const runJob = async (name, schema, prompt, normalize) => {
       const schemaPath = path.join(workDir, `${name}.schema.json`);
@@ -155,13 +358,23 @@ export async function analyzeWriting(input, { signal } = {}) {
       await writeFile(schemaPath, JSON.stringify(schema), 'utf8');
       let validationNote = '';
       for (let attempt = 0; attempt < 2; attempt++) {
+        if (provider.kind === 'workbuddy') {
+          try {
+            return normalize(await runWorkbuddy({ schema, prompt: prompt + validationNote, workDir, signal: controller.signal }));
+          } catch (error) {
+            if (error instanceof HttpError) throw error;
+            if (attempt === 1) throw new HttpError(502, `WorkBuddy 未能生成完整的正文和四项评分（已自动重试两次）。${engineNote()}请先在终端运行 codebuddy 并输入 /login 完成登录，或改用在「设置在线 AI」中配置的免费模型。你的原文已保留。`);
+            validationNote = `\nValidation failed: ${error instanceof ValidationError ? error.message : 'Invalid or truncated JSON'}. Return a fresh complete JSON result. Each score must include ${task.criterion}, CC, LR, GRA exactly once; all bands and range bounds must be 0 to 9 in steps of 0.5. ${name === 'model' ? `Write a complete response of at least ${task.minimum} English words. Keep annotations concise.` : 'Keep only 3-6 well-supported issues and 2 expressions.'} Copy exact source quotes. Never return placeholders.\n`;
+            continue;
+          }
+        }
         if (provider.kind !== 'codex') {
           try {
             return normalize(await completeJson(provider, { system: SAFETY_INSTRUCTIONS + '\n' + FEEDBACK_LANGUAGE, prompt: prompt + validationNote, schema, signal: controller.signal }));
           } catch (error) {
             if (!(error instanceof ProviderError) && !(error instanceof ValidationError)) throw error;
             if (error instanceof ProviderError && error.status !== 502) throw error;
-            if (attempt === 1) throw new HttpError(502, `${name === 'correction' ? '作文评估' : '独立范文'}未能生成完整的正文和四项评分。已自动重试；请尝试更强的模型或在「设置在线 AI」中连接在线服务。你的原文已保留。`);
+            if (attempt === 1) throw new HttpError(502, `${name === 'correction' ? '作文评估' : '独立范文'}未能生成完整的正文和四项评分（已自动重试两次）。${provider.kind === 'ollama' ? '本地小模型容易漏掉评分项或超出上下文，建议改用在「设置在线 AI」中连接云端模型，或换成更强的本地模型。' : '请检查网络后重试，或在「设置在线 AI」中换一个模型。'}你的原文已保留。${engineNote()}`);
             validationNote = `\nValidation failed: ${error instanceof ValidationError ? error.message : 'Invalid or truncated JSON'}. Return a fresh complete JSON result. Each score must include ${task.criterion}, CC, LR, GRA exactly once; all bands and range bounds must be 0 to 9 in steps of 0.5. ${name === 'model' ? `Write a complete response of at least ${task.minimum} English words. Keep annotations concise.` : 'Keep only 3-6 well-supported issues and 2 expressions.'} Copy exact source quotes. Never return placeholders.\n`;
             continue;
           }
@@ -195,14 +408,14 @@ export async function analyzeWriting(input, { signal } = {}) {
     const jobs = [];
     let parts;
     try {
-      if (provider.kind === 'ollama') {
-        // 本地串行生成，避免两个长上下文同时占据显存，让小内存设备频繁换页。
+      if (provider.kind === 'ollama' || provider.kind === 'workbuddy') {
+        // 本地模型和命令行会话都串行执行，避免两个长任务争用显存或同一个本机服务。
         parts = [];
         for (const task of tasks) { const job = task(); jobs.push(job); parts.push(await job); }
       } else { jobs.push(...tasks.map(task => task())); parts = await Promise.all(jobs); }
     } catch (error) {
       controller.abort(); await Promise.allSettled(jobs);
-      if (timedOut) throw new HttpError(504, '分析超过 10 分钟，请稍后重试。');
+      if (timedOut) throw new HttpError(504, `分析超过 10 分钟，已停止。${provider?.kind === 'ollama' ? '本地模型在 CPU 上经常达不到这个速度，建议改用在线 AI，或换用更小的本地模型。' : '请检查网络后重试。'}你的原文已保留。${engineNote()}`);
       if (error instanceof ProviderError) throw new HttpError(error.status, error.message);
       throw error;
     }
@@ -309,8 +522,12 @@ export function createServer({ analyze = analyzeWriting, status = getEngineStatu
           return sendJson(res, 200, { ...publicCloudSettings(cloudConfig), providerStatus:await status() });
         } finally { switching = false; res.off('close', abortProbe); }
       }
-      if (url.pathname === '/api/status' && req.method === 'GET') return sendJson(res, 200, await status());
-      if (url.pathname === '/api/provider' && req.method === 'GET') return sendJson(res, 200, await status());
+      if (url.pathname === '/api/status' && req.method === 'GET') return sendJson(res, 200, await status({ wait:false }));
+      // refresh=1 供“我已登录，重新检查”使用：丢掉 5 分钟缓存，等这一次真实探测结果。
+      if (url.pathname === '/api/provider' && req.method === 'GET') {
+        const refresh = url.searchParams.get('refresh') === '1';
+        return sendJson(res, 200, await status(refresh ? { wait:true, refresh:true } : { wait:false }));
+      }
       if (url.pathname === '/api/app-info' && req.method === 'GET') return sendJson(res, 200, { app: 'ielts-writing-studio', version: APP_VERSION, pid: process.pid });
       if (url.pathname === '/api/task1/image-to-text' && req.method === 'POST') {
         if (!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] || '')) throw new HttpError(415, '请使用 JSON 格式提交。');
@@ -321,6 +538,7 @@ export function createServer({ analyze = analyzeWriting, status = getEngineStatu
         if (!/^data:image\/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=]+$/.test(body.imageData)) throw new HttpError(400, '请选择 PNG、JPG 或 WebP 图片。');
         const provider = await resolveProvider();
         if (!['compatible','ollama'].includes(provider.kind)) throw new HttpError(503, '当前 AI 模式不支持图片识别，请切换到在线视觉模型或本地视觉模型。');
+        if (provider.kind === 'ollama') await assertOllamaModel(provider);
         const schema = {type:'object',properties:{sourceData:{type:'string',minLength:20,maxLength:10000},notes:{type:'array',items:{type:'string',maxLength:500},maxItems:6}},required:['sourceData','notes'],additionalProperties:false};
         const result = await completeVisionJson(provider,{schema,imageData:body.imageData,mimeType:body.mimeType,system:'You extract IELTS Academic Task 1 chart, process or map information. Return JSON only. Never guess unreadable values. All sourceData and notes must be in Simplified Chinese or concise English labels.',prompt:'Read the uploaded IELTS Task 1 image. Transcribe only visible title, chart type, units, dates, categories, values, process stages, or map changes. If a number or label is unclear, write “待确认” next to it. Do not write an essay or give a band score.',signal:AbortSignal.timeout(120000),maxTokens:3000});
         if (!result || typeof result.sourceData !== 'string' || result.sourceData.trim().length < 20) throw new HttpError(502, '视觉模型没有提取出足够的图表信息，请换一张清晰图片或手动补充。');
@@ -350,7 +568,7 @@ export function createServer({ analyze = analyzeWriting, status = getEngineStatu
         try {
           if ((await localAI.getStatus()).busy) throw new HttpError(409, '正在准备本地 AI，请完成后再切换。');
           const body = await readBody(req);
-          if (!['auto', 'ollama', 'codex', 'openai-compatible'].includes(body?.provider)) throw new HttpError(400, '不支持的 AI 模式。');
+          if (!['auto', 'ollama', 'codex', 'workbuddy', 'openai-compatible'].includes(body?.provider)) throw new HttpError(400, '不支持的 AI 模式。');
           if (body?.provider === 'ollama') {
             await localAI.restore?.();
             applyLocalConfig();
@@ -360,7 +578,8 @@ export function createServer({ analyze = analyzeWriting, status = getEngineStatu
             cloudConfig.selectedProvider = body.provider;
           }
           setProviderOverride(body.provider);
-          return sendJson(res, 200, await status());
+          // 用户刚切到 WorkBuddy 时往往才去登录，必须丢开缓存重新探测，否则会连续 5 分钟显示未登录。
+          return sendJson(res, 200, await status({ refresh: body.provider === 'workbuddy' }));
         } finally { switching = false; }
       }
       if (url.pathname === '/api/analyze' && req.method === 'POST') {

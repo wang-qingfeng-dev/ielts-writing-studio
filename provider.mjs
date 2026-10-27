@@ -14,6 +14,47 @@ export class ProviderError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
 
+// 服务商返回的错误正文只用于告诉用户真正的原因（余额、模型名、权限），
+// 截断并清除控制字符，避免把长响应或多余内容整段抛给页面。
+function upstreamDetail(data) {
+  const raw = data?.error?.message ?? data?.error?.code
+    ?? (typeof data?.error === 'string' ? data.error : undefined)
+    ?? data?.message ?? data?.msg;
+  if (typeof raw !== 'string' && typeof raw !== 'number') return '';
+  const text = String(raw).replace(/[\u0000-\u001f\u007f]+/gu, ' ').replace(/\s+/gu, ' ').trim();
+  if (!text) return '';
+  return text.length > 160 ? `${text.slice(0, 160)}…` : text;
+}
+function hostOf(url) { try { return new URL(String(url)).hostname; } catch { return ''; } }
+// 不同的 HTTP 状态码对应完全不同的处理动作；原来的统一文案让用户无从下手。
+function httpFailureMessage(status, data, { url = '' } = {}) {
+  const detail = upstreamDetail(data);
+  const seen = detail ? `（服务商返回：${detail}）` : '';
+  const host = hostOf(url);
+  const isDeepSeek = host.endsWith('deepseek.com');
+  switch (status) {
+    case 400:
+    case 422:
+      return `服务商拒绝了这次请求（HTTP ${status}）：通常是模型名称不被该接口支持，或某个参数不被接受${seen}。请展开“模型与接口地址”，核对模型名称是否与服务商控制台一致。`;
+    case 401:
+      return `API 密钥无效、已过期或已被删除（HTTP 401）。请在“设置在线 AI”中重新粘贴密钥；用 .env 配置的用户请核对 AI_API_KEY${seen}。`;
+    case 402:
+      return isDeepSeek
+        ? `DeepSeek 账户余额不足（HTTP 402）。请登录 platform.deepseek.com 的“充值”页面充值后再试；新账户若从未充值，所有 API 请求都会被拒绝${seen}。`
+        : `服务商账户余额不足（HTTP 402），请先在服务商控制台充值后再试${seen}。`;
+    case 403:
+      return `密钥没有访问该模型的权限，或账户未完成实名/开通（HTTP 403）。请到服务商控制台确认模型权限与账户状态${seen}。`;
+    case 404:
+      return `接口地址或模型不存在（HTTP 404）。请检查 API 地址是否缺少 /v1 结尾，以及模型名称是否拼写正确${seen}。`;
+    case 429:
+      return `服务商限流或免费额度已用尽（HTTP 429），请稍后重试或充值升级额度${seen}。`;
+    default:
+      return status >= 500
+        ? `服务商暂时故障（HTTP ${status}），请稍后重试${seen}。`
+        : `服务商返回了 HTTP ${status}${seen}。`;
+  }
+}
+
 function selectedProvider() {
   const selected = String(runtimeProviderOverride || process.env.AI_PROVIDER || 'auto').trim().toLowerCase();
   return selected === 'openai' ? 'openai-compatible' : selected;
@@ -35,8 +76,18 @@ function ollamaUrl() { return providerUrl(process.env.OLLAMA_HOST || DEFAULT_OLL
 function compatibleUrl() { return providerUrl(runtimeCloudConfig?.baseUrl || process.env.AI_BASE_URL || '', 'AI_BASE_URL'); }
 function isConfiguredCompatible() { return Boolean(runtimeCloudConfig?.baseUrl || process.env.AI_BASE_URL?.trim()); }
 function compatibleProviderName() {
-  const labels = { deepseek:'DeepSeek', doubao:'豆包模型 · 火山方舟', siliconflow:'硅基流动', hunyuan:'腾讯混元 API', openrouter:'OpenRouter 免费模型路由', custom:'自定义在线接口' };
+  const labels = { deepseek:'DeepSeek', doubao:'豆包模型 · 火山方舟', glm:'智谱 GLM', siliconflow:'硅基流动', hunyuan:'腾讯混元 API', openrouter:'OpenRouter 免费模型路由', custom:'自定义在线接口' };
   return labels[runtimeCloudConfig?.provider] || 'OpenAI 兼容接口';
+}
+
+// WorkBuddy 桌面版自带 codebuddy 命令行，可以用已登录的账号额度完成分析。
+export const WORKBUDDY_MODEL_LABELS = { 'fast-model':'快速模型', 'balanced-model':'标准模型', 'deep-model':'深度模型' };
+export function workbuddyModel() {
+  const configured = process.env.WORKBUDDY_MODEL?.trim() || process.env.IELTS_WORKBUDDY_MODEL?.trim();
+  return configured || 'balanced-model';
+}
+export function workbuddyModelLabel(model = workbuddyModel()) {
+  return WORKBUDDY_MODEL_LABELS[model] || model;
 }
 
 async function fetchJson(url, options = {}, signal) {
@@ -48,12 +99,7 @@ async function fetchJson(url, options = {}, signal) {
     const response = await requestJson(url, { ...options, signal, timeoutMs });
     const data = response.data;
     if (response.status < 200 || response.status >= 300) {
-      const message = response.status === 401 || response.status === 403
-        ? 'AI 接口认证失败，请检查服务端 AI_API_KEY 和模型权限。'
-        : response.status === 429
-          ? 'AI 接口额度或请求频率受限，请稍后重试。'
-          : 'AI 接口请求失败，请检查服务地址、模型名称和配置。';
-      throw new ProviderError(response.status, message);
+      throw new ProviderError(response.status, httpFailureMessage(response.status, response.data, { url }));
     }
     if (data === null) throw new ProviderError(502, 'AI 接口返回的内容不是有效 JSON。');
     return data;
@@ -74,6 +120,30 @@ async function ollamaAvailable() {
   try { const data = await fetch(`${ollamaUrl()}/api/tags`, { signal:AbortSignal.timeout(2500) }); return data.ok; } catch { return false; }
 }
 
+function modelTag(name) { return String(name).includes(':') ? String(name) : `${name}:latest`; }
+
+// 分析前先确认本地 Ollama 真的有这个模型。否则用户只会看到笼统的 HTTP 404，
+// 不知道是自己装的 Ollama 没下载模型，还是模型名不对。
+export async function assertOllamaModel(provider, signal) {
+  if (provider?.kind !== 'ollama') return [];
+  const deadline = signal && AbortSignal.any ? AbortSignal.any([signal, AbortSignal.timeout(4000)]) : AbortSignal.timeout(4000);
+  let models = [];
+  try {
+    const data = await fetchJson(`${provider.url}/api/tags`, {}, deadline);
+    models = Array.isArray(data?.models) ? data.models.map(item => typeof item?.name === 'string' ? item.name : '').filter(Boolean) : [];
+  } catch (error) {
+    if (error?.status === 499) throw error;
+    throw new ProviderError(503, `没有检测到本地 Ollama（${provider.url}）。请先启动电脑上的 Ollama；如果想由软件管理，请点击页面上的“一键准备本地 AI”，它会安装 Ollama 并下载模型。`);
+  }
+  if (!models.some(name => modelTag(name) === modelTag(provider.model))) {
+    const installed = models.length
+      ? `这台电脑已安装：${models.slice(0, 6).join('、')}${models.length > 6 ? ' 等' : ''}。`
+      : '这台电脑还没有下载任何本地模型。';
+    throw new ProviderError(503, `本地 Ollama 里没有 ${provider.model} 模型。${installed}请在终端运行 ollama pull ${provider.model} 后重试，或点击“一键准备本地 AI”自动下载。`);
+  }
+  return models;
+}
+
 export async function resolveProvider() {
   const selected = selectedProvider();
   const localProvider = () => ({ kind:'ollama', name:'Ollama 本地免费模型', model:modelName('ollama'), url:ollamaUrl() });
@@ -84,7 +154,8 @@ export async function resolveProvider() {
     return compatibleProvider();
   }
   if (selected === 'codex') return { kind:'codex', name:'Codex CLI', model:'当前 Codex 模型' };
-  if (selected !== 'auto') throw new ProviderError(503, 'AI_PROVIDER 不受支持，请使用 auto、ollama、openai-compatible 或 codex。');
+  if (selected === 'workbuddy') return { kind:'workbuddy', name:'WorkBuddy CLI', model:workbuddyModel(), modelLabel:workbuddyModelLabel() };
+  if (selected !== 'auto') throw new ProviderError(503, 'AI_PROVIDER 不受支持，请使用 auto、ollama、workbuddy、codex 或 openai-compatible。');
   if (await ollamaAvailable()) return localProvider();
   if (isConfiguredCompatible()) return compatibleProvider();
   // 账户型 Codex 调用必须明确选择；本地服务缺失时不能悄悄把作文提交给其他提供商。
@@ -92,7 +163,7 @@ export async function resolveProvider() {
 }
 
 export function setProviderOverride(provider) {
-  const allowed = ['auto','ollama','codex','openai-compatible'];
+  const allowed = ['auto','ollama','codex','workbuddy','openai-compatible'];
   if (!allowed.includes(provider)) throw new ProviderError(400, '不支持的 AI 模式。');
   runtimeProviderOverride = provider;
   return runtimeProviderOverride || 'auto';
@@ -106,11 +177,18 @@ export async function getProviderStatus() {
     if (provider.kind === 'ollama') {
       const tags = await fetchJson(`${provider.url}/api/tags`, {}, AbortSignal.timeout(2500));
       const models = Array.isArray(tags?.models) ? tags.models.map(item=>item?.name).filter(name=>typeof name === 'string') : [];
-      const expected = provider.model.includes(':') ? provider.model : `${provider.model}:latest`;
-      const hasModel = models.some(name => (name.includes(':') ? name : `${name}:latest`) === expected);
-      return { available:hasModel, provider:provider.kind, selected:getProviderOverride(), engine:`${provider.name} · ${provider.model}`, message:hasModel?'本地模型已连接；批改速度取决于电脑性能，评分仅供练习参考。':`本地尚无 ${provider.model}，请使用页面中的一键准备。` };
+      const hasModel = models.some(name => modelTag(name) === modelTag(provider.model));
+      const installed = models.length ? `已安装：${models.slice(0, 6).join('、')}${models.length > 6 ? ' 等' : ''}。` : '还没有下载任何模型。';
+      return {
+        available:hasModel, provider:provider.kind, selected:getProviderOverride(), engine:`${provider.name} · ${provider.model}`,
+        installedModels:models,
+        message:hasModel
+          ? '本地模型已连接；批改速度取决于电脑性能，评分仅供练习参考。'
+          : `本地 Ollama 里没有 ${provider.model}。${installed}请运行 ollama pull ${provider.model}，或点击“一键准备本地 AI”自动下载。`
+      };
     }
     if (provider.kind === 'compatible') return { available:true, provider:provider.kind, selected:getProviderOverride(), engine:`${provider.name} · ${provider.model}`, message:'已配置 OpenAI 兼容接口。密钥只在服务端读取。' };
+    if (provider.kind === 'workbuddy') return { available:false, provider:provider.kind, selected:getProviderOverride(), engine:`${provider.name} · ${provider.modelLabel}`, message:'WorkBuddy CLI 需要通过应用内的状态检查连接。' };
     return { available:false, provider:provider.kind, selected:getProviderOverride(), engine:provider.name, message:'未配置免费本地模型。安装 Ollama 并运行 pull 命令，或设置 AI_BASE_URL。' };
   } catch (error) {
     return { available:false, provider:provider?.kind || 'unknown', selected:getProviderOverride(), engine:provider ? `${provider.name} · ${provider.model}` : 'AI provider', message:provider?.kind === 'ollama' ? `未连接到 Ollama。请启动本地 Ollama，并运行 ollama pull ${provider.model} 下载模型。` : error.message || 'AI 服务不可用。' };
@@ -157,7 +235,7 @@ export async function completeJson(provider, { system, prompt, schema, signal, m
     const base={model:provider.model,messages:[{role:'system',content:instructions},{role:'user',content:prompt}],temperature:0.2,max_tokens:maxTokens};
     // DeepSeek 现行 API 默认思考模式开启，短连接测试会耗尽预算而没有正文。
     // 只向官方主机传其专用参数，不影响其他兼容服务。
-    if (['api.deepseek.com', 'ark.cn-beijing.volces.com'].includes(new URL(provider.url).hostname)) base.thinking = { type:'disabled' };
+    if (['api.deepseek.com', 'ark.cn-beijing.volces.com', 'open.bigmodel.cn'].includes(new URL(provider.url).hostname)) base.thinking = { type:'disabled' };
     if (new URL(provider.url).hostname === 'openrouter.ai') base.reasoning = { enabled:false };
     const headers={'Content-Type':'application/json'};
     // 凭据只可发送至它绑定的地址，不能让另一个兼容接口继承当前密钥。
@@ -179,7 +257,7 @@ export async function completeVisionJson(provider, { system, prompt, imageData, 
     const url = `${provider.url}/chat/completions`;
     const instructions = `${system}\nReturn exactly one JSON object matching this JSON Schema:\n${JSON.stringify(schema)}`;
     const base = { model: provider.model, messages: [{ role:'system', content:instructions }, { role:'user', content:[{type:'text',text:prompt},{type:'image_url',image_url:{url:imageData}}] }], temperature:0.1, max_tokens:maxTokens };
-    if (['api.deepseek.com','ark.cn-beijing.volces.com'].includes(new URL(provider.url).hostname)) base.thinking={type:'disabled'};
+    if (['api.deepseek.com','ark.cn-beijing.volces.com','open.bigmodel.cn'].includes(new URL(provider.url).hostname)) base.thinking={type:'disabled'};
     if (new URL(provider.url).hostname === 'openrouter.ai') base.reasoning={enabled:false};
     const headers={'Content-Type':'application/json'};
     const runtimeMatches = runtimeCloudConfig?.baseUrl === provider.url;

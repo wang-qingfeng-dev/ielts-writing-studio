@@ -1,6 +1,6 @@
 # 句进 · 雅思写作工作台
 
-> v0.4.2：WorkBuddy 改成一键连接——点一下按钮，页面自己打开官方登录页，登录完自动连上，不用再找文件、双击 .cmd、手打 `/login`；连上后可以直接选模型（23 个，分推荐 / 常用 / 更多三组）。0.4.1 的句式仿写与好词好句前置保持不变。Windows 便携包需要按本次提交重新构建；正式发布仍为 [v0.3.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.3.0)。
+> v0.4.3：修掉「升级后点一键连接只报接口不存在」——启动脚本会认出还在后台跑的旧版本并自动换成新的；WorkBuddy 一键连接本身保持不变：点一下按钮，页面自己打开官方登录页，登录完自动连上，不用找文件、双击 .cmd、手打 `/login`，连上后直接选模型（23 个，分推荐 / 常用 / 更多三组）。0.4.1 的句式仿写与好词好句前置保持不变。正式发布仍为 [v0.3.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.3.0)。
 
 [English](README.en.md) · [下载 v0.3.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.3.0) · [更新记录](CHANGELOG.md)
 

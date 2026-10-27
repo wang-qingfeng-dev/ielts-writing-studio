@@ -1,6 +1,6 @@
 # IELTS Writing Studio · 句进
 
-> v0.4.2 makes WorkBuddy a one-click connection: pick "WorkBuddy 账号" in the header, press the button, finish the official login page in your browser, and the panel flips to connected by itself — no terminal, no .cmd file, no typing /login. Once connected you can pick from 23 models in the same panel. The sentence-pattern practice from 0.4.1 is unchanged. The published installer is still v0.3.0.
+> v0.4.3 fixes the upgrade case where one-click connect answered with "接口不存在": the launcher now detects an older server still running in the background and swaps in the new build. The one-click WorkBuddy connection itself is unchanged: pick "WorkBuddy 账号" in the header, press the button, finish the official login page in your browser, and the panel flips to connected by itself — no terminal, no .cmd file, no typing /login. Once connected you can pick from 23 models in the same panel. The sentence-pattern practice from 0.4.1 is unchanged. The published installer is still v0.3.0.
 
 [简体中文](README.md) · [Download v0.2.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.2.0) · [Changelog](CHANGELOG.md)
 

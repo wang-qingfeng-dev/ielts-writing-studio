@@ -1,8 +1,8 @@
 # 句进 · 雅思写作工作台
 
-> v0.4.3：修掉「升级后点一键连接只报接口不存在」——启动脚本会认出还在后台跑的旧版本并自动换成新的；WorkBuddy 一键连接本身保持不变：点一下按钮，页面自己打开官方登录页，登录完自动连上，不用找文件、双击 .cmd、手打 `/login`，连上后直接选模型（23 个，分推荐 / 常用 / 更多三组）。0.4.1 的句式仿写与好词好句前置保持不变。正式发布仍为 [v0.3.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.3.0)。
+> v0.4.3：修掉「升级后点一键连接只报接口不存在」——启动脚本会认出还在后台跑的旧版本并自动换成新的；WorkBuddy 一键连接本身保持不变：点一下按钮，页面自己打开官方登录页，登录完自动连上，不用找文件、双击 .cmd、手打 `/login`，连上后直接选模型（23 个，分推荐 / 常用 / 更多三组）。0.4.1 的句式仿写与好词好句前置保持不变。最新发布：[v0.4.3](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.4.3)（Windows 免安装版）。
 
-[English](README.en.md) · [下载 v0.3.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.3.0) · [更新记录](CHANGELOG.md)
+[English](README.en.md) · [下载 v0.4.3](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.4.3) · [更新记录](CHANGELOG.md)
 
 **v0.2.0** 支持 Task 1 学术类与培训类、Task 2，以及 DeepSeek、豆包（火山方舟）等在线接口。首次配置自己的 API 密钥，以后直接在应用内批改；不提供共享额度。
 
@@ -29,15 +29,15 @@
 
 ### Windows：下载便携版
 
-1. 下载 [句进 v0.2.0 Windows x64 便携版 ZIP](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.2.0/ielts-writing-studio-v0.2.0-windows-x64.zip)。
+1. 下载 [句进 v0.4.3 Windows x64 免安装版 ZIP](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.4.3/ielts-writing-studio-v0.4.3-windows-x64.zip)。
 2. **先完整解压**到一个文件夹，不要在压缩包里直接运行。
-3. 双击解压目录中的 `Start Portable.cmd`，打开本机网页。
+3. 双击解压目录中的 `Start Writing Studio.cmd`（或 `Start Portable.cmd`），打开本机网页。
 
 便携版已附带 Node.js，无需单独安装 Node。**不包含 AI 模型**：打开后可以立即体验标明为示例的完整教学内容；批改自己的作文还需要配置下方任意一种 AI 服务。此下载包适用于 Windows x64。
 
 ### Windows：小白一键安装（推荐）
 
-下载 [句进 v0.2.0 一键安装程序](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.2.0/ielts-writing-studio-v0.2.0-windows-x64-setup.exe)，双击后按中文向导完成安装。安装程序自带 Node.js，不需要打开命令行。
+下载 [句进 v0.3.0 一键安装程序](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.3.0/ielts-writing-studio-v0.3.0-windows-x64-setup.exe)，双击后按中文向导完成安装。安装程序自带 Node.js，不需要打开命令行。安装版目前最新仍是 v0.3.0；v0.4.x 先只提供免安装版，覆盖解压即升级。
 
 **升级：** v0.1.2 及更早版本没有更新入口，请先关闭旧版并运行这次安装程序，安装到原目录。从 v0.2.0 起，Windows x64 安装版可在页面底部点“检查更新”→“下载、安装并重启”。只在用户点击后联网和下载，校验 SHA-256 后安装；保留同一浏览器、地址和端口的学习记录，以及外部 AI 配置与模型。便携版、源码和 Mac 请下载新包。重要笔记建议先导出。
 

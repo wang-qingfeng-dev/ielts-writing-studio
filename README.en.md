@@ -1,8 +1,8 @@
 # IELTS Writing Studio · 句进
 
-> v0.4.3 fixes the upgrade case where one-click connect answered with "接口不存在": the launcher now detects an older server still running in the background and swaps in the new build. The one-click WorkBuddy connection itself is unchanged: pick "WorkBuddy 账号" in the header, press the button, finish the official login page in your browser, and the panel flips to connected by itself — no terminal, no .cmd file, no typing /login. Once connected you can pick from 23 models in the same panel. The sentence-pattern practice from 0.4.1 is unchanged. The published installer is still v0.3.0.
+> v0.4.3 fixes the upgrade case where one-click connect answered with "接口不存在": the launcher now detects an older server still running in the background and swaps in the new build. The one-click WorkBuddy connection itself is unchanged: pick "WorkBuddy 账号" in the header, press the button, finish the official login page in your browser, and the panel flips to connected by itself — no terminal, no .cmd file, no typing /login. Once connected you can pick from 23 models in the same panel. The sentence-pattern practice from 0.4.1 is unchanged. Latest release: [v0.4.3](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.4.3) (portable Windows build); the installer is still v0.3.0.
 
-[简体中文](README.md) · [Download v0.2.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.2.0) · [Changelog](CHANGELOG.md)
+[简体中文](README.md) · [Download v0.4.3](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.4.3) · [Changelog](CHANGELOG.md)
 
 **v0.2.0** supports Task 1 and Task 2, DeepSeek, Doubao via Volcengine Ark and other compatible APIs. Use your own API key; no shared quota is included. Academic Task 1 requires chart/process/map information as text, not an image upload.
 
@@ -37,7 +37,7 @@ Existing installations can restore their previously installed model without a fo
 
 ### Windows portable download
 
-Download [ielts-writing-studio-v0.2.0-windows-x64.zip](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.2.0/ielts-writing-studio-v0.2.0-windows-x64.zip), extract the entire archive, then double-click `Start Portable.cmd`. Node.js is included; AI models are not.
+Download [ielts-writing-studio-v0.4.3-windows-x64.zip](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.4.3/ielts-writing-studio-v0.4.3-windows-x64.zip), extract the entire archive, then double-click `Start Writing Studio.cmd`. Node.js is included; AI models are not.
 
 ### Mac download
 

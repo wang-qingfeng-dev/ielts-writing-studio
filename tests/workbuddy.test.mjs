@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
 import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
-import { analyzeWriting, parseWorkbuddyOutput, createServer } from '../server.mjs';
+import { analyzeWriting, parseWorkbuddyOutput, createServer, workbuddyEnv } from '../server.mjs';
 import { createCloudSettingsStore } from '../cloud-settings.mjs';
 import { setProviderOverride, getProviderOverride } from '../provider.mjs';
 import { DEMO_PROMPT, DEMO_ESSAY, DEMO_ANALYSIS } from '../public/demo.js';
@@ -126,4 +126,22 @@ test('GET /api/provider?refresh=1 asks for a fresh probe instead of the cached s
   await fetch(`${base}/api/provider`);
   assert.deepEqual(seen[0], { wait: true, refresh: true }, '点“重新检查”必须丢掉缓存并等待真实结果');
   assert.deepEqual(seen[1], { wait: false }, '普通轮询仍然不等探测结果');
+});
+
+test('the gateway spawn environment forces the lite bundle and strips proxy variables', () => {
+  const previous = { proxy: process.env.HTTPS_PROXY, lite: process.env.CODEBUDDY_FORCE_LITE_WB_BUNDLE };
+  process.env.HTTPS_PROXY = 'http://127.0.0.1:7890';
+  process.env.https_proxy = 'http://127.0.0.1:7890';
+  delete process.env.CODEBUDDY_FORCE_LITE_WB_BUNDLE;
+  try {
+    const env = workbuddyEnv();
+    // 安装包只带 codebuddy-lite-wb.mjs；不带这个变量，--serve 会报 MODULE_NOT_FOUND。
+    assert.equal(env.CODEBUDDY_FORCE_LITE_WB_BUNDLE, '1');
+    assert.equal(env.HTTPS_PROXY, undefined, '代理变量会让命令行启动阶段报 setProxy 错误');
+    assert.equal(env.https_proxy, undefined, '小写副本也要一起清掉');
+    assert.equal(env.NO_PROXY, '*');
+  } finally {
+    if (previous.proxy === undefined) delete process.env.HTTPS_PROXY; else process.env.HTTPS_PROXY = previous.proxy;
+    if (previous.lite === undefined) delete process.env.CODEBUDDY_FORCE_LITE_WB_BUNDLE; else process.env.CODEBUDDY_FORCE_LITE_WB_BUNDLE = previous.lite;
+  }
 });

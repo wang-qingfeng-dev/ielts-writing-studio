@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { parseGatewayBanner, createWorkbuddyGateway, GatewayError } from '../workbuddy-gateway.mjs';
+import { parseGatewayBanner, createWorkbuddyGateway, GatewayError, summarizeFailure, describeExit } from '../workbuddy-gateway.mjs';
 
 const BANNER = `mods: loaded mod "subscription-gate" from .codebuddy-plugin (tier user, hooks: prompt.submit)
   CodeBuddy Code HTTP Server
@@ -141,4 +141,18 @@ test('a 401 from the gateway is marked so the page can offer a login button', as
   });
   await assert.rejects(gateway.accountStatus(), error => error instanceof GatewayError && error.code === 'unauthorized');
   gateway.stop();
+});
+
+test('a missing bundle is explained in plain words instead of a stack trace', async () => {
+  const stderr = [
+    "node:internal/modules/cjs/loader:1247",
+    "Error: Cannot find module '../dist/codebuddy'",
+    "Require stack:",
+    "- D://Software//WorkBuddyAI//resources//app.asar.unpacked//cli//bin//codebuddy",
+    "{ code: 'MODULE_NOT_FOUND' }",
+  ].join('\n');
+  assert.equal(summarizeFailure(stderr), "Error: Cannot find module '../dist/codebuddy'");
+  assert.match(describeExit(1, summarizeFailure(stderr)), /命令行组件不完整/u);
+  assert.doesNotMatch(describeExit(1, summarizeFailure(stderr)), /Require stack/u);
+  assert.match(describeExit(2, 'boom'), /退出码 2/u);
 });

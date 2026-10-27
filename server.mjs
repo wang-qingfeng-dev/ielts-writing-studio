@@ -146,10 +146,15 @@ async function cliLaunch(file) {
 }
 
 // 代理变量会让 WorkBuddy 命令行在启动阶段报 setProxy 错误，这里按官方启动器的做法清掉。
-function workbuddyEnv() {
+export function workbuddyEnv() {
   const env = { ...process.env, NO_COLOR: '1' };
   for (const key of ['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'http_proxy', 'https_proxy', 'all_proxy', 'npm_config_proxy', 'npm_config_https_proxy']) delete env[key];
   env.NO_PROXY = '*'; env.no_proxy = '*';
+  // 当前版 WorkBuddy 的安装包只带精简网关产物（dist/codebuddy-lite-wb.mjs）。
+  // 不设这个变量时 `--serve` 会去 require 不存在的完整包，直接报 MODULE_NOT_FOUND——
+  // 在 WorkBuddy 桌面版里点过的人没事，因为它自己的环境带着这个变量；双击启动就翻车。
+  // 老版本安装包产物齐全时会按 lite → headless → full 逐级回退，设了也无害。
+  env.CODEBUDDY_FORCE_LITE_WB_BUNDLE = '1';
   return env;
 }
 

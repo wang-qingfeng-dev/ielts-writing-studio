@@ -34,6 +34,30 @@ function unwrap(payload) {
   return payload;
 }
 
+// 子进程失败时 stderr 往往是一整段 Node 堆栈；挑一句有用的，别把安装路径和栈甩给用户。
+export function summarizeFailure(text) {
+  const lines = String(text || '')
+    .replace(/\u001b\[[0-9;]*m/gu, '')
+    .split(/\r?\n/u)
+    .map(line => line.trim())
+    .filter(Boolean);
+  const informative = lines.find(line => /MODULE_NOT_FOUND|Cannot find module|ERR_[A-Z_]+|Error:/u.test(line))
+    || lines[lines.length - 1]
+    || '';
+  return informative.slice(0, 200);
+}
+
+// 常见失败翻成人话：用户看得到「怎么办」，而不是一串报错。
+export function describeExit(code, detail) {
+  if (/MODULE_NOT_FOUND|Cannot find module|ERR_MODULE_NOT_FOUND/u.test(detail)) {
+    return 'WorkBuddy 的命令行组件不完整（安装目录里少了启动产物）。重装一次 WorkBuddy 桌面版就能修好，也可以先改用免费在线 AI。';
+  }
+  if (/EACCES|EPERM/u.test(detail)) {
+    return '没有权限启动 WorkBuddy 命令行。请把 WorkBuddy 装在默认目录，或以同一账号运行。';
+  }
+  return `WorkBuddy 没能启动（退出码 ${code}）。${detail ? `原因：${detail}` : ''}`;
+}
+
 export function createWorkbuddyGateway(options = {}) {
   const {
     findCli,
@@ -130,8 +154,8 @@ export function createWorkbuddyGateway(options = {}) {
           child.once('exit', code => {
             if (settled) return;
             finish();
-            const detail = String(lastBanner).replace(/\s+/gu, ' ').trim().slice(-200);
-            reject(new GatewayError(`WorkBuddy 没能启动（退出码 ${code}）。${detail ? `原因：${detail}` : ''}`, { code: 'exit', detail }));
+            const detail = summarizeFailure(lastBanner);
+            reject(new GatewayError(describeExit(code, detail), { code: 'exit', detail }));
           });
         })
         .catch(reject);

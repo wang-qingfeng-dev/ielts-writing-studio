@@ -1,6 +1,6 @@
 # IELTS Writing Studio · 句进
 
-> v0.4.0 adds expression drills built from your own essay, a WorkBuddy CLI provider that uses your existing WorkBuddy account, and free-tier presets (Zhipu GLM Flash, Hunyuan lite, Doubao quota). Source changes are not packaged yet; the installer is still v0.3.0.
+> v0.4.1 replaces the cloze/recall drills with sentence-pattern transfer practice: each pattern shows its skeleton and the original sentence, and you write three new sentences on three different topics. Grading runs locally and only checks three things — is the pattern there, is the sentence complete, is it your own content. The word bank moved directly under the writing area. The WorkBuddy CLI provider and free-tier presets from 0.4.0 are unchanged. The published installer is still v0.3.0.
 
 [简体中文](README.md) · [Download v0.2.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.2.0) · [Changelog](CHANGELOG.md)
 

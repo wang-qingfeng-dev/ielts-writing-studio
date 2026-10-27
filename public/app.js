@@ -4,7 +4,7 @@ import { initLocalAiSetup } from './local-ai-setup.js';
 import { initCloudAiSetup } from './cloud-ai-setup.js';
 import { taskProfile } from './writing-task.js';
 import { initAppUpdates } from './app-updates.js';
-import { initDrill } from './drills.js';
+import { initWordbank, buildWordbank } from './drills.js';
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -34,6 +34,8 @@ const icon = name => `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="
 $$('[data-icon]').forEach(el => { el.outerHTML = icon(el.dataset.icon); });
 
 let storageWarning = false;
+let issueLimit = 5;
+let issueLimitOwner = null;
 function read(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } }
 function write(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); return true; }
@@ -185,7 +187,7 @@ function renderAnalysis() {
   cloudAiSetup?.updateControls();
   renderPriorities();
   renderReview();
-  drill?.render();
+  wordbank?.render();
 }
 function renderModel() {
   const a = state.analysis;
@@ -222,16 +224,16 @@ function bookmarkButton(kind, item, index) {
 function renderReview() {
   const a = state.analysis;
   $('#errors-total').textContent = String(a?.issues.length || 0).padStart(2,'0');
-  $('#phrases-total').textContent = String(a?.expressions.length || 0).padStart(2,'0');
   $('#notes-total').textContent = String(a?.model.notes.length || 0).padStart(2,'0');
   if (!a) {
     $('#review-errors').innerHTML = '<div class="review-empty"><p>从你的真实错误开始。</p><span>分析后自动整理易错点与针对性小练习。</span></div>';
-    $('#review-phrases').innerHTML = '<div class="review-empty"><p>准确、自然，用得上。</p><span>收集搭配，同时记住它的使用场景。</span></div>';
     $('#review-notes').innerHTML = '<div class="review-empty"><p>好表达背后，也有好逻辑。</p><span>学习如何解释、举例和推进论证。</span></div>';
     return;
   }
-  $('#review-errors').innerHTML = a.issues.length ? a.issues.map((item,i)=>`<article class="review-card" id="review-issue-${i}"><div class="review-card-top"><span class="card-tag ${e(item.category)}">${e(CATEGORIES[item.category])} · ${item.priority==='essential'?'必须改':'可优化'}</span>${bookmarkButton('issue',item,i)}</div><div class="issue-pair"><div class="wrong">${e(item.original)}</div><div class="correct"><span aria-hidden="true">↳</span> ${e(item.replacement || '建议删除')}</div></div><p class="card-meaning">${e(item.explanation)}</p><button class="mini-btn" data-issue-index="${i}">做一道同类练习 ${icon('arrow')}</button></article>`).join('') : '<div class="review-empty">未发现需要标注的明显错误。继续检查论证的深度与完整性。</div>';
-  $('#review-phrases').innerHTML = a.expressions.map((item,i)=>`<article class="review-card"><div class="review-card-top"><span class="card-tag expression">${item.source==='model'?'来自范文':'来自精修'}</span>${bookmarkButton('expression',item,i)}</div><h4 class="card-title" lang="en">${e(item.text)}</h4><p class="card-meaning">${e(item.meaning)}</p><p class="card-example" lang="en">${e(item.example)}</p><p class="card-usage">${e(item.usage)}</p><button class="mini-btn" data-expression-index="${i}">换个话题，自己造句 ${icon('arrow')}</button></article>`).join('');
+  // 易错点先只铺开 5 条：一屏能扫完，比让用户一路滚到底更好用。
+  if (a !== issueLimitOwner) { issueLimit = 5; issueLimitOwner = a; }
+  const hiddenIssues = Math.max(0, a.issues.length - issueLimit);
+  $('#review-errors').innerHTML = a.issues.length ? a.issues.map((item,i)=> i >= issueLimit ? '' : `<article class="review-card" id="review-issue-${i}"><div class="review-card-top"><span class="card-tag ${e(item.category)}">${e(CATEGORIES[item.category])} · ${item.priority==='essential'?'必须改':'可优化'}</span>${bookmarkButton('issue',item,i)}</div><div class="issue-pair"><div class="wrong">${e(item.original)}</div><div class="correct"><span aria-hidden="true">↳</span> ${e(item.replacement || '建议删除')}</div></div><p class="card-meaning">${e(item.explanation)}</p><button class="mini-btn" data-issue-index="${i}">做一道同类练习 ${icon('arrow')}</button></article>`).join('') + (hiddenIssues ? `<button class="btn btn-secondary btn-small review-more" type="button" data-action="more-issues">再看其余 ${hiddenIssues} 条</button>` : '') : '<div class="review-empty">未发现需要标注的明显错误。继续检查论证的深度与完整性。</div>';
   $('#review-notes').innerHTML = a.model.notes.map((item,i)=>`<article class="review-card"><div class="review-card-top"><span class="card-tag logic">${e(item.label)}</span>${bookmarkButton('note',item,i)}</div><p class="card-example note-quote" lang="en">${e(item.quote)}</p><p class="card-meaning">${e(item.explanation)}</p><button class="mini-btn" data-note-index="${i}">拆解这句话 ${icon('arrow')}</button></article>`).join('');
 }
 function renderAll() {
@@ -525,7 +527,7 @@ function openIssue(index) {
 function openExpression(index) {
   const item=state.analysis?.expressions[index];if(!item)return;
   markActive(item.id);
-  openModal('让表达变成自己的',`<span class="card-tag expression">${item.source==='model'?'来自独立范文':'来自精修版本'}</span><h3 class="card-title" lang="en">${e(item.text)}</h3><p>${e(item.meaning)}</p><p class="card-usage">${e(item.usage)}</p><p class="card-example" lang="en">${e(item.example)}</p><div class="practice-box"><h3>换一个话题，写一个自己的句子</h3><p>试着谈谈教育、工作或环境，用上这个表达。</p><label class="sr-only" for="expression-answer">我的造句</label><textarea id="expression-answer" class="practice-input" placeholder="Write your own sentence here…" rows="3">${e(practiceAnswers.get(item.id)||'')}</textarea><button class="btn btn-primary btn-small" data-check-expression="${index}">检查是否用上搭配</button><div id="practice-feedback" class="practice-feedback hidden" role="status"></div></div>`, `<button class="btn btn-secondary btn-small" data-save-kind="expression" data-save-index="${index}">${icon('bookmark')} ${library.some(card=>card.id===getCard('expression',item).id)?'已在复习库 · 点击移除':'加入复习库'}</button>`);
+  openModal('让表达变成自己的',`<div class="expression-detail"><span class="card-tag expression">${item.source==='model'?'来自独立范文':'来自精修版本'}</span><h3 class="expression-detail-text" lang="en">${e(item.text)}</h3><p class="expression-detail-meaning">${e(item.meaning)}</p><p class="expression-detail-usage">${e(item.usage)}</p><p class="expression-detail-example" lang="en">${e(item.example)}</p></div><div class="practice-box"><h3>让这个句式变成自己的</h3><p>同一套骨架，换三个不同话题各写一句：句式用上了、句子写完整了、内容不是照抄原句，才算过关。</p><button class="btn btn-primary btn-small" data-train-expression="${index}">开始仿写 · 3 个话题 ${icon('arrow')}</button></div>`, `<button class="btn btn-secondary btn-small" data-save-kind="expression" data-save-index="${index}">${icon('bookmark')} ${library.some(card=>card.id===getCard('expression',item).id)?'已在复习库 · 点击移除':'加入复习库'}</button>`);
 }
 function openNote(index) {
   const item=state.analysis?.model.notes[index];if(!item)return;
@@ -540,7 +542,7 @@ function saveCard(kind,index,button) {
   const exists=library.some(record=>record.id===card.id);
   if (exists) library=library.filter(record=>record.id!==card.id);
   else library.push({...card,created:Date.now(),due:Date.now(),level:0});
-  write(KEYS.library,library);updateCounters();renderReview();
+  write(KEYS.library,library);updateCounters();renderReview();wordbank?.render();
   if(button.closest('.modal-footer')) button.innerHTML=`${icon(exists?'bookmark':'check')} ${exists?'加入复习库':'已在复习库 · 点击移除'}`;
   toast(exists?'已移出复习库，可随时重新收藏。':'已加入复习库，之后可以遮住答案自测。');
 }
@@ -564,13 +566,13 @@ function showLibrary(reset=false) {
 function exportNotes() {
   const a=state.analysis;if(!a)return;
   const scoreText=score=>`预估 Band：${formatRange(score)}\n\n${score.criteria.map(item=>`- ${item.key} ${CRITERIA[item.key]}：${formatBand(item.band)}\n  依据：${item.evidence}\n  建议：${item.action}`).join('\n')}`;
-  const content=`# 句进 · 雅思写作学习笔记\n\n${state.mode==='demo'?'预设示例，供学习体验。\n\n':''}日期：${new Date().toLocaleDateString('zh-CN')}\n目标：Band ${formatBand(state.targetBand)}\nAI 练习估分，非官方成绩。\n\n## 题型\n\n${taskProfile(state.taskType).label}\n\n## 题目\n\n${state.prompt}${state.taskType==='task1-academic' ? '\n\n## 原图文字材料\n\n'+state.taskData : ''}\n\n## 我的原文\n\n${state.essay}\n\n${scoreText(a.originalScore)}\n\n## 精修版本\n\n${a.corrected.text}\n\n${scoreText(a.corrected.score)}\n\n## 独立范文\n\n${a.model.text}\n\n${scoreText(a.model.score)}\n\n## 本次提分重点\n\n${a.priorities.map((item,i)=>`${i+1}. ${item.title}：${item.description}`).join('\n')}\n\n## 易错点\n\n${a.issues.map(item=>`### ${CATEGORIES[item.category]}\n\n原句：${item.original}\n\n修改：${item.replacement}\n\n原因：${item.explanation}\n\n练习：${item.practice.question}\n\n参考答案：${item.practice.answer}`).join('\n\n')}\n\n## 实用搭配\n\n${a.expressions.map(item=>`### ${item.text}\n\n${item.meaning}\n\n用法：${item.usage}\n\n例句：${item.example}`).join('\n\n')}\n\n## 好句与论证\n\n${a.model.notes.map(item=>`### ${item.label}\n\n${item.quote}\n\n${item.explanation}`).join('\n\n')}\n`;
+  const content=`# 句进 · 雅思写作学习笔记\n\n${state.mode==='demo'?'预设示例，供学习体验。\n\n':''}日期：${new Date().toLocaleDateString('zh-CN')}\n目标：Band ${formatBand(state.targetBand)}\nAI 练习估分，非官方成绩。\n\n## 题型\n\n${taskProfile(state.taskType).label}\n\n## 题目\n\n${state.prompt}${state.taskType==='task1-academic' ? '\n\n## 原图文字材料\n\n'+state.taskData : ''}\n\n## 我的原文\n\n${state.essay}\n\n${scoreText(a.originalScore)}\n\n## 精修版本\n\n${a.corrected.text}\n\n${scoreText(a.corrected.score)}\n\n## 独立范文\n\n${a.model.text}\n\n${scoreText(a.model.score)}\n\n## 本次提分重点\n\n${a.priorities.map((item,i)=>`${i+1}. ${item.title}：${item.description}`).join('\n')}\n\n## 易错点\n\n${a.issues.map(item=>`### ${CATEGORIES[item.category]}\n\n原句：${item.original}\n\n修改：${item.replacement}\n\n原因：${item.explanation}\n\n练习：${item.practice.question}\n\n参考答案：${item.practice.answer}`).join('\n\n')}\n\n## 好词好句\n\n${a.expressions.map(item=>`### ${item.text}\n\n${item.meaning}\n\n用法：${item.usage}\n\n例句：${item.example}`).join('\n\n')}\n\n## 好句与论证\n\n${a.model.notes.map(item=>`### ${item.label}\n\n${item.quote}\n\n${item.explanation}`).join('\n\n')}\n`;
   const url=URL.createObjectURL(new Blob(['\ufeff',content],{type:'text/markdown;charset=utf-8'}));
   const link=document.createElement('a');link.href=url;link.download=`句进-写作笔记-${new Date().toISOString().slice(0,10)}.md`;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
   toast('学习笔记已导出，包含三篇作文、评分和复习内容。');
 }
 function showAbout() {
-  openModal('写作工作台 · 使用与评分说明',`<div class="about-content"><h3>一次练习，走完一个学习闭环</h3><ol><li>选择题型并粘贴完整题目。Task 1 建议 20 分钟、150 词；Task 2 建议 40 分钟、250 词。学术类 Task 1 还需填写原图数据或流程/地图描述。</li><li>点击「开始分析」，先看三个重点，再点击原文和精修版的高亮。</li><li>中栏保留观点做必要修改；右栏只根据题目独立创作，可按需展开。</li><li>收藏常犯错误和好表达，通过换题造句与间隔复习形成记忆。</li><li>做完批改后点「开始训练」：系统会用这篇作文里的真实好词好句出 11 道填空、中译英和改错题，答完即时判分，错题可以只练那几道。</li></ol><h3>评分怎么看</h3><p>Task 1 使用任务完成度 TA，Task 2 使用任务回应 TR；其余三项为连贯与衔接 CC、词汇资源 LR、语法多样性与准确性 GRA。单篇四项等权，展示 AI 参考区间与文本证据。</p><p>这是练习估分，不能替代正式考试结果。语法修正不一定改善论证，范文也不会自动获得满分。这里评估单篇作文，不计算整场 Writing 总成绩。</p><h3>关于保存与 AI</h3><p>草稿、最近 30 篇练习和复习卡保存在当前浏览器。清除浏览器数据会移除这些记录，请通过「导出学习笔记」备份。</p><p>本地 Ollama 在你的电脑上分析作文；在线 AI 会把题目和作文发送给所选服务商，使用你的账户额度。在线设置中输入的 API 密钥只保存在本机应用配置，不写入练习记录，可以随时删除。Codex 与 WorkBuddy 模式使用本机命令行已登录的账号额度，不需要再填 API 密钥。在线列表里排在前面的是有免费额度的服务，但都需要在服务商网站注册并实名，免费规则以对方当前公告为准。示例为预设内容，服务失败时不会拿示例冒充分析结果。</p><p>小练习的答案对照与搭配检查为本地检查；「用上了搭配」不代表整句语法已通过 AI 审核。</p><a href="https://ielts.org/take-a-test/your-results/ielts-scoring-in-detail" target="_blank" rel="noopener noreferrer">查看 IELTS 官方评分说明 ↗</a></div>`);
+  openModal('写作工作台 · 使用与评分说明',`<div class="about-content"><h3>一次练习，走完一个学习闭环</h3><ol><li>选择题型并粘贴完整题目。Task 1 建议 20 分钟、150 词；Task 2 建议 40 分钟、250 词。学术类 Task 1 还需填写原图数据或流程/地图描述。</li><li>点击「开始分析」，先看三个重点，再点击原文和精修版的高亮。</li><li>中栏保留观点做必要修改；右栏只根据题目独立创作，可按需展开。</li><li>先看「本篇好词好句」：句式卡给骨架，表达卡给现成搭配，都带原句和出处。</li><li>点「照着写一句」进句式仿写：同一个句式换三个不同话题各写一句。判分只看三件事——句式是否用上、句子是否完整、是否换成了自己的内容，全部在本机完成，不消耗 AI 额度。错题可以只练那几条。</li></ol><h3>评分怎么看</h3><p>Task 1 使用任务完成度 TA，Task 2 使用任务回应 TR；其余三项为连贯与衔接 CC、词汇资源 LR、语法多样性与准确性 GRA。单篇四项等权，展示 AI 参考区间与文本证据。</p><p>这是练习估分，不能替代正式考试结果。语法修正不一定改善论证，范文也不会自动获得满分。这里评估单篇作文，不计算整场 Writing 总成绩。</p><h3>关于保存与 AI</h3><p>草稿、最近 30 篇练习和复习卡保存在当前浏览器。清除浏览器数据会移除这些记录，请通过「导出学习笔记」备份。</p><p>本地 Ollama 在你的电脑上分析作文；在线 AI 会把题目和作文发送给所选服务商，使用你的账户额度。在线设置中输入的 API 密钥只保存在本机应用配置，不写入练习记录，可以随时删除。Codex 与 WorkBuddy 模式使用本机命令行已登录的账号额度，不需要再填 API 密钥。在线列表里排在前面的是有免费额度的服务，但都需要在服务商网站注册并实名，免费规则以对方当前公告为准。示例为预设内容，服务失败时不会拿示例冒充分析结果。</p><p>小练习的答案对照与搭配检查为本地检查；「用上了搭配」不代表整句语法已通过 AI 审核。</p><a href="https://ielts.org/take-a-test/your-results/ielts-scoring-in-detail" target="_blank" rel="noopener noreferrer">查看 IELTS 官方评分说明 ↗</a></div>`);
 }
 
 document.addEventListener('click', async event=>{
@@ -597,11 +599,12 @@ document.addEventListener('click', async event=>{
     feedback.innerHTML=data.revealIssue!==undefined?`<strong>参考答案</strong><p lang="en">${e(item.practice.answer)}</p>`:correct?`${icon('check')} 与参考答案一致。下一篇尝试独立用对。`:`<strong>${answer.trim()?'与参考答案有差异，可以对照看看。':'先写下你的答案，再对照参考。'}</strong><p lang="en">${e(item.practice.answer)}</p><span class="score-note">其他表达也可能成立；这里仅做参考答案对照。</span>`;
     return;
   }
-  if(data.checkExpression!==undefined){
-    const item=state.analysis.expressions[Number(data.checkExpression)];const answer=$('#expression-answer').value;practiceAnswers.set(item.id,answer);
-    const used=normalizeAnswer(answer).includes(normalizeAnswer(item.text));
-    const feedback=$('#practice-feedback');feedback.classList.remove('hidden');
-    feedback.textContent=used?'已用上这个搭配！再检查主谓一致、时态和语境。这是搭配检查，不是完整语法评分。':'还没有找到这个搭配的完整形式。你可以对照上面的例句再试一次；合理的词形变化也可以成立。';return;
+  if(data.trainExpression!==undefined){
+    const index=Number(data.trainExpression);
+    const item=buildWordbank({analysis:state.analysis,essay:state.essay}).find(entry=>entry.expressionIndex===index);
+    if(!item){toast('这一条暂时没有可仿写的句式，先在「本篇好词好句」里选一个。');return;}
+    wordbank.start([item]);
+    return;
   }
   if(data.saveNotePractice!==undefined){const value=$('#note-answer').value;if(!value.trim()){toast('先写一句自己的表达。');return;}practiceAnswers.set(`note-${data.saveNotePractice}`,value);toast('这次尝试已暂存，关闭弹窗后仍可查看。');return;}
   if(data.historyId){
@@ -627,6 +630,7 @@ document.addEventListener('click', async event=>{
     case 'close-modal':closeModal();break;
     case 'about':showAbout();break;
     case 'export':exportNotes();break;
+    case 'more-issues':issueLimit = state.analysis?.issues.length || issueLimit; renderReview(); break;
     case 'copy-corrected':case 'copy-model':
       try { await navigator.clipboard.writeText(data.action==='copy-model'?state.analysis.model.text:state.analysis.corrected.text);toast('已复制到剪贴板。'); }catch {toast('浏览器未允许复制，请选中文本手动复制。');}break;
     case 'rewrite':{
@@ -651,9 +655,10 @@ document.addEventListener('keydown',event=>{
     event.preventDefault();const tabs=['original','corrected','model'];const index=tabs.indexOf(state.activeTab);const next=tabs[(index+(event.key==='ArrowRight'?1:2))%3];setMobileTab(next);$(`[data-tab="${next}"]`).focus();
   }
 });
-const drill = initDrill({
+const wordbank = initWordbank({
   getState: () => ({ analysis: state.analysis, essay: state.essay, busy: state.busy || localAiBusy || cloudAiBusy }),
   openModal, closeModal, toast,
+  bookmark: index => bookmarkButton('expression', state.analysis.expressions[index], index),
 });
 renderAll();
 setMobileTab('original');

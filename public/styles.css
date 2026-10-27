@@ -539,6 +539,55 @@ h1 > span { color: #7d9170; }
 .under-workspace { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 13px 3px 0; }
 .estimate-disclaimer { color: #a3ab96; font-size: 11px; text-align: right; }
 
+/* 在线 AI 说明收成一行，不再占用一个卡片的高度。 */
+.ai-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 11px 13px;
+  background: rgb(244 249 246 / 72%);
+  border: 1px solid #e2ece6;
+  border-radius: 11px;
+}
+.ai-line-icon { display: grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; color: #4e7d63; background: #e7f1ea; border-radius: 8px; }
+.ai-line-icon .icon { width: 15px; height: 15px; }
+.ai-line-copy { min-width: 0; flex: 1; }
+.ai-line-copy h2 { color: #3f5c4c; font-size: 12px; font-weight: 600; line-height: 1.6; }
+.ai-line-copy p { margin-top: 1px; color: #8a978f; font-size: 11px; line-height: 1.7; }
+.ai-line .btn { flex-shrink: 0; }
+.ai-line .btn { white-space: nowrap; }
+
+/* 报告分隔条：把「写作区」和「分析结果」分成两段，顺带给一个跳转入口。 */
+.report-divider { display: flex; align-items: center; gap: 12px; margin: 34px 0 0; }
+.report-divider-label { flex-shrink: 0; color: #5f7466; font-size: 11px; font-weight: 600; letter-spacing: 1.4px; }
+.report-divider-line { flex: 1; height: 1px; background: linear-gradient(90deg, #cfdccf, rgb(207 220 207 / 12%)); }
+.report-jumps { display: flex; flex-wrap: wrap; gap: 6px; }
+.report-jumps a {
+  padding: 4px 10px;
+  color: #6c8172;
+  background: rgb(255 255 255 / 66%);
+  border: 1px solid #dde7e0;
+  border-radius: 99px;
+  font-size: 11px;
+  text-decoration: none;
+  transition: color .18s, border-color .18s, background .18s;
+}
+.report-jumps a:hover { color: var(--green); background: white; border-color: #bcd3c1; }
+.report-jumps a:focus-visible { outline: 3px solid #abc7a0; outline-offset: 2px; }
+
+/* 本地 AI 只是备选路径：空闲时压成一行，真正在下载或出错时才展开全部说明。 */
+.local-ai-setup:not(.is-busy):not(.is-ready):not(.has-error) { padding: 12px 16px; gap: 14px 18px; background: rgb(246 250 245 / 66%); }
+.local-ai-setup:not(.is-busy):not(.is-ready):not(.has-error) .local-ai-setup-copy .eyebrow,
+.local-ai-setup:not(.is-busy):not(.is-ready):not(.has-error) .local-ai-setup-copy p,
+.local-ai-setup:not(.is-busy):not(.is-ready):not(.has-error) .local-ai-progress,
+.local-ai-setup:not(.is-busy):not(.is-ready):not(.has-error) .local-ai-setup-meta { display: none; }
+.local-ai-setup:not(.is-busy):not(.is-ready):not(.has-error) .local-ai-setup-copy h2 { font-size: 13px; color: #4a6152; }
+.local-ai-setup:not(.is-busy):not(.is-ready):not(.has-error) .local-ai-setup-icon { flex-basis: 27px; width: 27px; height: 27px; border-radius: 8px; }
+.local-ai-setup:not(.is-busy):not(.is-ready):not(.has-error) .local-ai-setup-icon .icon { width: 15px; height: 15px; }
+.local-ai-setup:not(.is-busy):not(.is-ready):not(.has-error) .local-ai-setup-progress-row { justify-content: flex-end; color: #8a9683; font-weight: 400; }
+.local-ai-setup:not(.is-busy):not(.is-ready):not(.has-error) .local-ai-setup-actions .btn { min-width: 0; }
+
 /* 只保留少量重点，让反馈直接转化为行动。 */
 .priority-strip {
   display: grid;
@@ -562,75 +611,97 @@ h1 > span { color: #7d9170; }
 .priority-item h3 { margin-bottom: 5px; color: #5b704f; font-size: 13px; font-weight: 600; }
 .priority-item p { color: #89957d; font-size: 13px; line-height: 1.9; }
 
-/* 好词好句训练：把批改结果里真正出现过的表达，变成能写出来的肌肉记忆。 */
-.drill-section { margin-top: 16px; }
-.drill-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 16px 26px;
-  padding: 22px 24px;
-  background: white;
-  border: 1px solid var(--line);
-  border-radius: 13px;
-  box-shadow: var(--shadow);
+/* 好词好句：批改完成后最该先看的一块。卡片既是读物，也是仿写入口。 */
+.wordbank { margin-top: 28px; }
+.wordbank .section-heading { align-items: flex-start; }
+.wordbank-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(272px, 1fr)); gap: 12px; }
+.word-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 16px 17px 15px;
+  background: rgb(255 255 255 / 78%);
+  border: 1px solid #dfe8e1;
+  border-radius: 15px;
+  box-shadow: 0 8px 26px rgb(31 62 48 / 5%);
+  transition: border-color .18s, box-shadow .18s, transform .18s;
 }
-.drill-copy .eyebrow { margin-bottom: 5px; font-size: 11px; }
-.drill-copy h2 { color: var(--ink); font-size: 18px; font-weight: 600; letter-spacing: -.4px; }
-.drill-copy p { max-width: 560px; margin-top: 7px; color: #929a8c; font-size: 13px; line-height: 1.85; }
-.drill-metrics { display: flex; align-items: center; gap: 24px; }
-.drill-metrics > div { display: flex; flex-direction: column; gap: 2px; min-width: 62px; }
-.drill-metrics strong { color: #4c6350; font-family: var(--font-essay); font-size: 21px; font-weight: 500; line-height: 1.2; font-variant-numeric: tabular-nums; }
-.drill-metrics span { color: #a0a894; font-size: 11px; }
-.drill-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
-.drill-empty { grid-column: 1 / -1; margin: 0; color: #a0a894; font-size: 12px; }
+.word-card.is-pattern {
+  border-color: #d3e2d6;
+  background: linear-gradient(180deg, rgb(252 255 253 / 94%), rgb(247 251 248 / 78%));
+  box-shadow: inset 3px 0 0 #a8c6ad, 0 8px 26px rgb(31 62 48 / 6%);
+}
+.word-card:hover { transform: translateY(-2px); border-color: #bdd4c3; box-shadow: 0 14px 34px rgb(31 62 48 / 9%); }
+.word-card.is-pattern:hover { box-shadow: inset 3px 0 0 #8fb597, 0 14px 34px rgb(31 62 48 / 9%); }
+.word-card-top { display: flex; align-items: center; gap: 7px; margin-bottom: 9px; }
+.word-card-top .card-tag { margin-bottom: 0; }
+.word-card-top .icon-btn { width: 24px; height: 24px; margin-left: auto; color: #a4b294; }
+.word-card-top .icon-btn:hover, .word-card-top .icon-btn.is-saved { color: var(--green); background: var(--green-soft); }
+.word-source { color: #a3aca0; font-size: 11px; }
+.word-done { margin-left: auto; padding: 1px 6px; border-radius: 5px; background: #eaf4ed; color: #3f7857; font-size: 10px; }
+.word-done + .icon-btn { margin-left: 4px; }
+.word-text { color: var(--ink); font-family: var(--font-essay); font-size: 19px; font-weight: 500; line-height: 1.35; letter-spacing: -.2px; overflow-wrap: anywhere; }
+.word-text.is-pattern-name { font-family: var(--font-ui); font-size: 15px; font-weight: 600; letter-spacing: 0; line-height: 1.45; }
+.word-usage {
+  margin-top: 9px;
+  color: #93a08c;
+  font-size: 11px;
+  line-height: 1.75;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.word-tagline { margin-top: 9px; color: #97a290; font-size: 11px; line-height: 1.7; overflow-wrap: anywhere; }
+.word-tagline b { color: #5e7d63; font-family: var(--font-essay); font-weight: 500; }
+.word-meaning { margin-top: 4px; color: #7b877e; font-size: 12px; line-height: 1.7; }
+.word-skeleton { margin-top: 11px; padding: 8px 10px; background: #f1f7ee; border: 1px dashed #cfe0c6; border-radius: 8px; color: #34553f; font-family: var(--font-essay); font-size: 14px; line-height: 1.65; overflow-wrap: anywhere; }
+.word-skeleton.is-plain { border-style: solid; border-color: #e3ebd9; background: #f6f8f2; color: #7d8a72; font-family: var(--font-ui); font-size: 12px; }
+.word-sentence { margin-top: 9px; color: #5c6b61; font-family: var(--font-essay); font-size: 13.5px; line-height: 1.78; overflow-wrap: anywhere; }
+.word-sentence mark { padding: 0 2px; background: #f6efcd; color: #574a1c; border-radius: 3px; }
+.word-card .mini-btn { align-self: flex-start; margin-top: auto; padding-top: 12px; }
+.wordbank-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 18px; margin-top: 13px; color: #98a292; font-size: 11px; line-height: 1.8; }
+.wordbank-foot-note { color: #aab3a2; }
+.wordbank-empty { padding: 24px 24px; background: rgb(255 255 255 / 62%); border: 1px dashed #dbe4d2; border-radius: 14px; color: #8d9784; font-size: 13px; line-height: 1.95; }
+.wordbank-empty p { color: #6f7f66; }
+.wordbank-empty span { color: #a1aa99; }
+
+/* 仿写弹窗：一屏只放一个句式、一个话题，交卷后立刻知道哪一条没过。 */
 .drill-session-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 9px; color: #97a08f; font-size: 12px; }
 .drill-session-top .card-tag { margin-bottom: 0; }
 .drill-progress { height: 4px; overflow: hidden; background: #e9eee2; border-radius: 99px; }
 .drill-progress > span { display: block; height: 100%; background: var(--green); border-radius: 99px; transition: width .28s ease; }
-.drill-instruction { margin: 18px 0 0; color: #77866d; font-size: 13px; }
-.drill-sentence {
-  margin: 12px 0 10px;
-  padding: 16px 18px;
-  color: #33493a;
-  background: #f7faf3;
-  border: 1px solid #e3ebdb;
-  border-left: 3px solid #b9cf9f;
-  border-radius: 8px;
-  font-family: var(--font-essay);
-  font-size: 17px;
-  line-height: 1.85;
-  overflow-wrap: anywhere;
-}
-.drill-hint { color: #8b9680; font-size: 13px; line-height: 1.8; }
-.drill-input {
-  width: 100%;
-  margin: 12px 0 10px;
-  padding: 11px 13px;
-  color: var(--ink);
-  background: white;
-  border: 1px solid #d6e0cb;
-  border-radius: 8px;
-  font-family: var(--font-essay);
-  font-size: 16px;
-  line-height: 1.7;
-}
+.drill-pattern-name { margin-top: 15px; color: var(--ink); font-family: var(--font-essay); font-size: 22px; font-weight: 500; line-height: 1.35; letter-spacing: -.3px; overflow-wrap: anywhere; }
+.drill-skeleton { margin-top: 10px; padding: 12px 14px; background: #f1f7ee; border: 1px dashed #cfe0c6; border-radius: 9px; color: #33543e; font-family: var(--font-essay); font-size: 17px; line-height: 1.7; overflow-wrap: anywhere; }
+.drill-origin { margin-top: 10px; padding-left: 11px; border-left: 2px solid #dfe8d5; color: #6a7a6c; font-family: var(--font-essay); font-size: 14px; line-height: 1.8; overflow-wrap: anywhere; }
+.drill-origin mark { padding: 0 2px; background: #f6efcd; color: #574a1c; border-radius: 3px; }
+.drill-hint { margin-top: 9px; color: #85917e; font-size: 13px; line-height: 1.85; }
+.drill-topic { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 9px; margin-top: 15px; padding: 11px 13px; background: #fdf7e6; border: 1px solid #f0e5c5; border-radius: 9px; }
+.drill-topic-label { color: #a08b4c; font-size: 11px; }
+.drill-topic strong { color: #6a551d; font-size: 14px; font-weight: 600; }
+.drill-topic > span:last-child { color: #a9986a; font-family: var(--font-essay); font-size: 12px; }
+.drill-input { width: 100%; min-height: 86px; margin: 11px 0 0; padding: 11px 13px; color: var(--ink); background: white; border: 1px solid #d6e0cb; border-radius: 9px; font-family: var(--font-essay); font-size: 16px; line-height: 1.75; resize: vertical; }
 .drill-input:focus { border-color: #9dba82; box-shadow: 0 0 0 3px #e9f1df; outline: none; }
 .drill-input:read-only { background: #f7f8f3; }
-.drill-session-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.drill-feedback { margin-top: 14px; padding: 13px 15px; border: 1px solid #e3ebd9; border-radius: 8px; background: #f5f8f0; color: #6f7f66; font-size: 13px; line-height: 1.8; }
-.drill-feedback.is-correct { color: #4f6b45; background: #eff6e9; border-color: #d8e6c9; }
-.drill-feedback.is-close { color: #8c7434; background: #fbf5e6; border-color: #efe2c2; }
-.drill-feedback.is-wrong, .drill-feedback.is-revealed { color: #94655a; background: #fbf1ed; border-color: #f0ded7; }
-.drill-feedback p { margin-top: 4px; color: #3d5642; font-family: var(--font-essay); font-size: 15px; overflow-wrap: anywhere; }
-.drill-feedback .drill-detail { color: #7d8b71; font-size: 13px; }
+.drill-session-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 11px; }
+.drill-feedback { margin-top: 14px; padding: 14px 15px; border: 1px solid #e3ebd9; border-radius: 10px; background: #f5f8f0; font-size: 13px; line-height: 1.8; }
+.drill-feedback.is-correct { background: #eff6e9; border-color: #d8e6c9; }
+.drill-feedback.is-partial { background: #fbf6e8; border-color: #ece0c0; }
+.drill-feedback.is-wrong, .drill-feedback.is-revealed { background: #fbf1ed; border-color: #f0ded7; }
+.drill-verdict { color: #4f6353; }
+.drill-check-icon { display: grid; place-items: center; flex-shrink: 0; width: 17px; height: 17px; margin-top: 2px; border-radius: 50%; font-size: 11px; line-height: 1; }
+.drill-check-icon.is-pass { background: #d8ecd4; color: #2f6b3f; }
+.drill-check-icon.is-fail { background: #f7ddd5; color: #a4544a; }
+.drill-checks { display: grid; gap: 7px; margin: 10px 0 0; padding: 0; list-style: none; }
+.drill-checks li { display: flex; align-items: flex-start; gap: 8px; }
+.drill-checks li strong { display: block; color: #46584b; font-size: 13px; font-weight: 600; }
+.drill-checks li em { display: block; color: #8b9680; font-size: 12px; font-style: normal; line-height: 1.7; }
+.drill-checks li.is-fail strong { color: #8b5148; }
+.drill-example-label { margin-top: 13px; color: #9aa48f; font-size: 11px; }
+.drill-example { margin-top: 3px; color: #3d5642; font-family: var(--font-essay); font-size: 15px; line-height: 1.85; overflow-wrap: anywhere; }
 .drill-summary .eyebrow { font-size: 11px; }
-.drill-summary h3 { margin: 6px 0 13px; color: var(--ink); font-size: 19px; font-weight: 600; }
+.drill-summary h3 { margin: 6px 0 13px; color: var(--ink); font-size: 19px; font-weight: 600; line-height: 1.45; }
 .drill-summary > p { margin: 13px 0; color: #8b9680; font-size: 13px; line-height: 1.9; }
-.drill-missed { margin-top: 14px; padding-top: 13px; border-top: 1px solid #eef1e8; }
-.drill-missed h4 { margin-bottom: 8px; color: #7c8a6f; font-size: 12px; font-weight: 600; }
-.drill-missed-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.drill-missed-item .card-tag { margin-bottom: 0; flex-shrink: 0; }
-.drill-missed-item p { color: #3d5642; font-family: var(--font-essay); font-size: 14px; overflow-wrap: anywhere; }
 
 .review-section { padding-top: 35px; }
 .section-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; margin-bottom: 18px; }
@@ -638,7 +709,7 @@ h1 > span { color: #7d9170; }
 .section-heading h2 { color: var(--ink); font-size: 20px; font-weight: 600; letter-spacing: -.6px; }
 .section-description { margin-top: 6px; color: #959c8e; font-size: 13px; }
 .section-actions { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
-.review-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.review-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px; align-items: start; }
 .review-column { min-width: 0; }
 .review-column-heading { display: flex; align-items: center; gap: 7px; margin-bottom: 13px; padding: 0 2px 10px; border-bottom: 1px solid #dde3d5; color: #6f7b65; font-size: 11px; font-weight: 600; }
 .review-column-heading .icon { width: 14px; height: 14px; color: #8e9c82; }
@@ -765,6 +836,8 @@ h1 > span { color: #7d9170; }
   .criterion-top { gap: 4px; }
   .criterion-name { font-size: 11px; }
   .priority-strip { grid-template-columns: .8fr 1fr 1fr 1fr; }
+  .wordbank-grid { grid-template-columns: repeat(auto-fill, minmax(238px, 1fr)); }
+  .word-text { font-size: 18px; }
   .priority-intro { padding: 0 17px; }
   .priority-item { padding-left: 37px; padding-right: 14px; }
   .priority-index { left: 14px; }
@@ -806,12 +879,8 @@ h1 > span { color: #7d9170; }
   .priority-intro { grid-column: 1 / -1; padding: 0 20px 17px; margin: 0 0 15px; border-bottom: 1px solid #dde5d3; flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 10px; flex-wrap: wrap; }
   .priority-intro .eyebrow { display: none; }
   .priority-item:nth-child(2) { border-left: 0; }
-  .drill-card { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 20px; }
-  .drill-actions { grid-column: auto; }
-  .drill-metrics { justify-content: flex-start; gap: 20px; }
+  .wordbank-grid { grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); }
   .review-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 16px; }
-  .review-column:last-child { grid-column: 1 / -1; }
-  #review-notes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; align-items: start; }
   #review-notes > .empty-state, #review-notes > .review-empty { grid-column: 1 / -1; }
   .review-card { padding: 17px 18px 13px; }
   .local-ai-setup { grid-template-columns: minmax(0, 1.35fr) minmax(190px, 1fr); }
@@ -842,6 +911,13 @@ h1 > span { color: #7d9170; }
   .task-badge { font-size: 11px; }
   .prompt-textarea { min-height: 115px; font-size: 15px; line-height: 1.8; }
   .prompt-footer { flex-wrap: wrap; gap: 10px 13px; }
+  .ai-line { flex-wrap: wrap; gap: 9px; padding: 11px; }
+  .ai-line-copy { flex: 1 1 100%; order: 2; }
+  .ai-line .btn { order: 3; flex: 1 1 100%; justify-content: center; }
+  .report-divider { flex-wrap: wrap; gap: 8px; margin-top: 26px; }
+  .report-divider-line { display: none; }
+  .report-jumps { gap: 5px; }
+  .report-jumps a { padding: 4px 9px; font-size: 11px; }
   .prompt-hint { width: 100%; max-width: none; text-align: left; font-size: 11px; margin-left: 0; }
   .workspace-toolbar { margin-top: 17px; gap: 10px; }
   .local-ai-setup { grid-template-columns: 1fr; gap: 14px; margin-top: 14px; padding: 17px; }
@@ -882,12 +958,19 @@ h1 > span { color: #7d9170; }
   .priority-item { padding: 12px 19px 12px 43px; border: 0; }
   .priority-index { top: 11px; left: 18px; }
   .priority-item h3 { margin-bottom: 3px; font-size: 11px; }
-  .drill-card { padding: 17px; }
-  .drill-metrics { gap: 16px; }
-  .drill-metrics > div { min-width: 0; }
-  .drill-metrics strong { font-size: 18px; }
-  .drill-sentence { padding: 14px 15px; font-size: 16px; }
-  .drill-actions .btn { flex: 1 1 140px; }
+  .wordbank { margin-top: 22px; }
+  .wordbank-grid { grid-template-columns: 1fr; }
+  .wordbank .section-heading { flex-direction: column; align-items: stretch; gap: 12px; }
+  .wordbank .section-actions { flex-wrap: wrap; }
+  .wordbank .section-actions .btn { flex: 1 1 140px; }
+  .word-text { font-size: 18px; }
+  .word-card.is-pattern .word-text { font-size: 15px; }
+  .wordbank-foot { flex-direction: column; gap: 3px; }
+  .drill-pattern-name { font-size: 19px; }
+  .drill-skeleton { font-size: 15px; padding: 11px 12px; }
+  .drill-origin { font-size: 13px; }
+  .drill-session-actions .btn { flex: 1 1 140px; }
+  .drill-feedback { padding: 12px 13px; }
   .priority-item p { font-size: 13px; }
   .review-section { padding-top: 27px; }
   .section-heading { align-items: flex-start; gap: 10px; margin-bottom: 17px; }
@@ -1088,3 +1171,43 @@ h1 { letter-spacing: -1.25px; }
   .header-inner { height: 70px; }
   .header-update-button { display: none; }
 }
+
+/* 版面收尾：让报告区更呼吸，也让窄屏的顶部不再挤压正文。 */
+.review-column { padding: 0; background: transparent; box-shadow: none; }
+.review-column-heading { padding-bottom: 9px; }
+.review-card { background: rgb(255 255 255 / 88%); }
+.priority-item p { color: #7d8a71; }
+.wordbank + .review-section { padding-top: 42px; }
+.report-divider + .priority-strip { margin-top: 14px; }
+
+@media (max-width: 639px) {
+  html { scroll-padding-top: 128px; }
+  .header-inner { padding: 9px 15px; gap: 8px; }
+  .brand-mark { width: 28px; height: 28px; border-radius: 9px; }
+  .brand-mark > svg { width: 21px; height: 21px; }
+  .brand-name { font-size: 14px; }
+  .header-actions { gap: 4px; }
+  .header-actions .btn { min-height: 30px; padding: 6px 8px; }
+  .provider-select { max-width: 104px; min-height: 30px; }
+  h1 { font-size: 25px; line-height: 1.34; }
+  h1 > span { display: block; }
+  .ai-line { display: grid; grid-template-columns: 26px minmax(0, 1fr); grid-template-areas: "icon copy" "btn btn"; align-items: start; gap: 8px 10px; }
+  .ai-line-icon { grid-area: icon; width: 26px; height: 26px; }
+  .ai-line-icon .icon { width: 14px; height: 14px; }
+  .ai-line-copy { grid-area: copy; }
+  .ai-line-copy h2 { font-size: 12px; }
+  .ai-line-copy p { margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .ai-line .btn { grid-area: btn; width: 100%; margin-top: 2px; }
+  .local-ai-setup:not(.is-busy):not(.is-ready):not(.has-error) { grid-template-columns: minmax(0, 1fr) auto; gap: 10px 12px; padding: 11px 13px; }
+  .local-ai-setup:not(.is-busy):not(.is-ready):not(.has-error) .local-ai-setup-status { display: none; }
+  .wordbank + .review-section { padding-top: 30px; }
+}
+.card-tag.pattern { color: #5d7a48; background: #e9f0dd; box-shadow: inset 0 0 0 1px #d9e5c7; }
+.review-column { -webkit-backdrop-filter: none; backdrop-filter: none; background: transparent; }
+.review-more { width: 100%; margin-top: 4px; justify-content: center; color: #7f8f76; background: rgb(255 255 255 / 62%); }
+
+/* 表达详情弹窗：和好词好句卡片同一套排版，点进来不觉得是另一套界面。 */
+.expression-detail .expression-detail-text { margin: 4px 0 0; color: var(--ink); font-family: var(--font-essay); font-size: 23px; font-weight: 500; letter-spacing: -.3px; line-height: 1.35; overflow-wrap: anywhere; }
+.expression-detail .expression-detail-meaning { margin-top: 6px; color: #74826b; font-size: 14px; line-height: 1.8; }
+.expression-detail .expression-detail-usage { margin-top: 11px; color: #909b89; font-size: 13px; line-height: 1.85; }
+.expression-detail .expression-detail-example { margin-top: 13px; padding: 11px 14px; background: #f6f9f1; border-left: 3px solid #c6dbb0; border-radius: 0 9px 9px 0; color: #46594a; font-family: var(--font-essay); font-size: 15px; line-height: 1.8; overflow-wrap: anywhere; }

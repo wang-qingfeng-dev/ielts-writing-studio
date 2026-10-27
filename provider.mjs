@@ -1,4 +1,5 @@
 import { requestJson } from './http-json.mjs';
+import { DEFAULT_WORKBUDDY_MODEL, normalizeWorkbuddyModel, workbuddyModelLabel as labelWorkbuddyModel } from './workbuddy-models.mjs';
 
 const DEFAULT_OLLAMA_URL = 'http://127.0.0.1:11434';
 const DEFAULT_OLLAMA_MODEL = 'qwen3.5:4b';
@@ -6,6 +7,7 @@ const configuredTimeout = Number(process.env.AI_TIMEOUT_MS || 600000);
 const timeoutMs = Number.isFinite(configuredTimeout) ? Math.max(10000, Math.min(configuredTimeout, 900000)) : 600000;
 let runtimeProviderOverride = null;
 let runtimeCloudConfig = null;
+let runtimeWorkbuddyModel = '';
 
 // 网页设置只存储在服务端，密钥不会进入页面或模型提示。
 export function setCloudConfig(config) { runtimeCloudConfig = config ? { ...config } : null; }
@@ -81,13 +83,18 @@ function compatibleProviderName() {
 }
 
 // WorkBuddy 桌面版自带 codebuddy 命令行，可以用已登录的账号额度完成分析。
-export const WORKBUDDY_MODEL_LABELS = { 'fast-model':'快速模型', 'balanced-model':'标准模型', 'deep-model':'深度模型' };
+// 模型由用户在页面上选，选择结果存在本机；没选过就用环境变量或默认值。
 export function workbuddyModel() {
+  if (runtimeWorkbuddyModel) return runtimeWorkbuddyModel;
   const configured = process.env.WORKBUDDY_MODEL?.trim() || process.env.IELTS_WORKBUDDY_MODEL?.trim();
-  return configured || 'balanced-model';
+  return normalizeWorkbuddyModel(configured) || DEFAULT_WORKBUDDY_MODEL;
+}
+export function setWorkbuddyModel(model) {
+  runtimeWorkbuddyModel = normalizeWorkbuddyModel(model);
+  return workbuddyModel();
 }
 export function workbuddyModelLabel(model = workbuddyModel()) {
-  return WORKBUDDY_MODEL_LABELS[model] || model;
+  return labelWorkbuddyModel(model);
 }
 
 async function fetchJson(url, options = {}, signal) {

@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
-import { mkdtemp, writeFile, readFile, rm, stat } from 'node:fs/promises';
-import { analyzeWriting, parseWorkbuddyOutput, createServer, workbuddyLoginScript } from '../server.mjs';
+import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
+import { analyzeWriting, parseWorkbuddyOutput, createServer } from '../server.mjs';
 import { createCloudSettingsStore } from '../cloud-settings.mjs';
 import { setProviderOverride, getProviderOverride } from '../provider.mjs';
 import { DEMO_PROMPT, DEMO_ESSAY, DEMO_ANALYSIS } from '../public/demo.js';
@@ -63,8 +63,8 @@ test('WorkBuddy output accepts the CLI envelope and a bare structured result', (
 test('WorkBuddy output turns an unauthenticated response into an actionable message', () => {
   assert.throws(
     () => parseWorkbuddyOutput('{"is_error":true,"result":"Authentication required. Please use /login command to sign in to your account"}'),
-    // 有登录脚本时指路到 Login WorkBuddy.cmd，没有时才退回到 codebuddy 命令。
-    error => error.status === 503 && /登录/u.test(error.message) && /\/login/u.test(error.message) && /(Login WorkBuddy\.cmd|codebuddy)/u.test(error.message)
+    // 现在统一指向页面上的「一键连接」，不再让用户去找文件或敲命令。
+    error => error.status === 503 && /还没有登录/u.test(error.message) && /一键连接/u.test(error.message) && !/\/login/u.test(error.message)
   );
   assert.throws(() => parseWorkbuddyOutput('not json at all'), /not valid JSON|was not JSON/);
 });
@@ -90,7 +90,7 @@ test('a WorkBuddy analysis explains the one-time login instead of failing silent
   process.env.FAKE_WORKBUDDY_MODE = 'auth';
   await assert.rejects(
     analyzeWriting({ prompt: DEMO_PROMPT, essay: DEMO_ESSAY, targetBand: 7 }),
-    error => error.status === 503 && /还没有登录/u.test(error.message) && /\/login/u.test(error.message)
+    error => error.status === 503 && /还没有登录/u.test(error.message) && /一键连接/u.test(error.message)
   );
 });
 
@@ -106,12 +106,6 @@ test('a missing WorkBuddy installation points at the environment variable', asyn
     analyzeWriting({ prompt: DEMO_PROMPT, essay: DEMO_ESSAY, targetBand: 7 }),
     error => error.status === 503 && /IELTS_WORKBUDDY_PATH/u.test(error.message)
   );
-});
-
-test('the login helper script exists so the page can point at a real file', async () => {
-  const script = workbuddyLoginScript();
-  assert.ok(script, '应能找到 Login WorkBuddy.cmd');
-  assert.ok((await stat(script)).isFile(), `${script} 应该是真实文件`);
 });
 
 test('GET /api/provider?refresh=1 asks for a fresh probe instead of the cached status', async t => {

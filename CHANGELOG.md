@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.2 — WorkBuddy 改成一键连接，模型可以自己选
+
+- **连接不再需要用户找目录、双击文件、手打 `/login`。** 原来的 `Login WorkBuddy.cmd` 和 `login-workbuddy.ps1` 已删除：它们在当前版 WorkBuddy 上也跑不通（安装包里只有精简产物，没有独立终端界面）。现在改由应用自己在后台启动 WorkBuddy 的本地网关（`codebuddy --serve`），通过它的账号接口取回官方登录链接，页面直接打开浏览器登录，登录完成后自动检测并把面板切成「已连接」。
+- 新增 `workbuddy-gateway.mjs`：负责启动、解析端口与随机密码、带 `Authorization: Bearer` 调用网关接口、空闲十分钟自动退出、随应用退出一起收走。
+- 新增 `workbuddy-models.mjs`：23 个可用模型的清单（推荐 / 常用 / 更多三组，带中文名和一句说明），选择结果存在 `%LOCALAPPDATA%\JujinWritingStudio\settings\workbuddy.json`，分析时通过 `--model` 传入。
+- 新增接口：`GET /api/workbuddy`（安装状态、是否已连接、当前模型与全部可选模型）、`POST /api/workbuddy/login`（取回官方登录链接）、`POST /api/workbuddy/model`（保存模型，非法名称一律拒绝）。
+- 连接面板重做：一个主按钮「一键连接 WorkBuddy」，点击后打开登录页并进入等待态，每 2.5 秒自动确认一次，最多等三分钟；连上后同一面板里直接选模型，改了立刻显示在顶部状态栏。任何一步失败都给出「改用免费在线 AI」的退路。
+- 顶部下拉里的 `WorkBuddy CLI` 改名为 `WorkBuddy 账号 · 免密钥`；未登录时的报错文案统一指向「一键连接」，不再出现终端命令。
+- 判断是否已登录只看本机凭证文件（`~/.credentials.json` 等），不采信网关自报的 authenticated——后者在未登录时也是 true。
+- 顺带：切换到 WorkBuddy 时不再弹重复提示盖住面板；已连接状态下的按钮层级收敛为「重新登录 / 改用免费在线 AI」。
+- 全套 195 项测试通过（新增网关、模型清单、三个接口共 19 项）。
+
 ## 0.4.1 — 句式仿写取代填空，好词好句提到台前
 
 - 已构建 Windows 便携包：`ielts-writing-studio-v0.4.1-windows-x64.zip`（39.7 MB，源提交 `5f8bd48`，SHA256 `257eff8b17348cda93be2e42c3df0b8d5ad75033b57e979f42bc61be014dfb5a`）；解压实跑确认版本号与「本篇好词好句」区块均在包内。`setup.exe` 仍依赖 Inno Setup 6，本机未安装。

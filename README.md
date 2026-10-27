@@ -1,6 +1,6 @@
 # 句进 · 雅思写作工作台
 
-> v0.4.1：训练改成「句式仿写」——每个句式给骨架和原句，换三个不同话题各写一句，交卷即判分（句式是否用上、句子是否完整、是否换了自己的内容，全在本机完成）；「本篇好词好句」从页面底部提到写作区正下方，句式卡与表达卡都带原句高亮和一键仿写；在线 AI 说明和本地 AI 入口各收成一行，页面分为「写作区 / 本次分析报告」两段。0.4.0 带来的 WorkBuddy CLI 接入与免费模型预设保持不变。Windows 便携包需要按本次提交重新构建；正式发布仍为 [v0.3.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.3.0)。
+> v0.4.2：WorkBuddy 改成一键连接——点一下按钮，页面自己打开官方登录页，登录完自动连上，不用再找文件、双击 .cmd、手打 `/login`；连上后可以直接选模型（23 个，分推荐 / 常用 / 更多三组）。0.4.1 的句式仿写与好词好句前置保持不变。Windows 便携包需要按本次提交重新构建；正式发布仍为 [v0.3.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.3.0)。
 
 [English](README.en.md) · [下载 v0.3.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.3.0) · [更新记录](CHANGELOG.md)
 
@@ -21,7 +21,7 @@
 - 每篇优先解决三个问题，并整理错误、搭配、好句与论证方法。
 - 好词好句与句式仿写：把本篇精修稿与范文里的好句识别成 23 种高频句式之一，给出骨架、原句高亮与中文讲解；同一个句式换三个不同话题各写一句，交卷即判分，并记录一次达标率与已掌握的句式数。
 - 收藏后按 1、3、7、14、30 天复习，保存最多 30 篇练习，导出 Markdown 学习笔记。
-- 右上角选择「自动 / Ollama 本地 / 在线 AI / WorkBuddy CLI / Codex CLI」，分析或连接测试中禁止切换。
+- 右上角选择「自动 / Ollama 本地 / 在线 AI / WorkBuddy 账号 / Codex CLI」，分析或连接测试中禁止切换。
 - 网页提供在线 AI 设置：按「有免费额度 / 按量付费」分组选择服务商，输入自己的密钥，测试成功后保存；无需编辑配置文件或下载本地模型。
 - 正文与四项评分必须通过完整性检查；无法核实的高亮会省略并明确提示，失败或取消会保留原稿和之前完成的结果。
 
@@ -60,13 +60,16 @@
 
 ### 用 WorkBuddy 的账号额度（不买 API 也能用）
 
-WorkBuddy 桌面版自带 `codebuddy` 命令行，本应用可以直接调用它，用你已登录账号的额度批改，不需要再单独买 API：
+WorkBuddy 桌面版自带 `codebuddy`，本应用可以直接调用它，用你已登录账号的额度批改，不需要再单独买 API。整个连接过程只有一步：
 
-1. 打开终端（PowerShell 或 CMD），运行 `codebuddy`（或 `cbc`）。
-2. 输入 `/login`，按提示完成一次登录，然后退出。
-3. 回到页面右上角选择「WorkBuddy CLI」。
+1. 右上角下拉里选「WorkBuddy 账号」。
+2. 面板里点「一键连接 WorkBuddy」，浏览器会打开 WorkBuddy 官方登录页。
+3. 登录完回到页面——面板会自动变成「已连接」，不用点确认，也不用输入任何命令。
+4. 在同一个面板里选模型（推荐 / 常用 / 更多三组，共 23 个），选择会记住。
 
-命令行以只读结构化模式运行：禁用全部工具（`--tools ""`）、用 `--json-schema` 约束输出、每次使用系统临时端口，不读写你的文件。提示「还没有登录」说明第 2 步没做；提示找不到命令时，请把环境变量 `IELTS_WORKBUDDY_PATH` 指向 WorkBuddy 安装目录下的 `resources/app.asar.unpacked/cli/bin/codebuddy` 再重启软件。默认用账号的标准模型，可用 `WORKBUDDY_MODEL=deep-model` 换成更强的型号。命令行调用会占用你自己的 WorkBuddy 额度。
+连接方式是：应用在后台启动 WorkBuddy 自带的本地网关（`codebuddy --serve`，随机端口 + 随机密码，只监听 127.0.0.1），用它取回官方登录链接并判断登录结果；网关空闲十分钟自动退出，应用关闭时一起结束。分析本身仍以只读结构化模式运行：禁用全部工具（`--tools ""`）、用 `--json-schema` 约束输出，不读写你的文件。
+
+「已连接」的判断依据是本机出现了 WorkBuddy 的凭证文件（`~/.credentials.json` 等），不采信网关自报的状态。找不到 WorkBuddy 时，把环境变量 `IELTS_WORKBUDDY_PATH` 指向 `resources/app.asar.unpacked/cli/bin/codebuddy` 后重启软件；模型也可以用 `WORKBUDDY_MODEL` 指定默认值。命令行调用会占用你自己的 WorkBuddy 额度。
 
 ### Mac 下载（Apple Silicon / Intel）
 

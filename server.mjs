@@ -6,7 +6,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { correctionSchema, modelSchema, validateCorrection, validateModel, validateAnalysis, validateRequest, ValidationError } from './analysis-schema.mjs';
-import { resolveProvider, getProviderStatus, setProviderOverride, getProviderOverride, completeJson, completeVisionJson, assertOllamaModel, ProviderError, setCloudConfig, workbuddyModel, workbuddyModelLabel } from './provider.mjs';
+import { resolveProvider, getProviderStatus, setProviderOverride, getProviderOverride, completeJson, completeVisionJson, assertOllamaModel, ProviderError, setCloudConfig, workbuddyModel, workbuddyModelLabel, setWorkbuddyModel } from './provider.mjs';
 import { createLocalAIManager } from './local-ai.mjs';
 import { normalizeCorrection, normalizeModel } from './analysis-normalization.mjs';
 import { generateLocalModel } from './local-model.mjs';
@@ -15,6 +15,8 @@ import { taskProfile } from './public/writing-task.js';
 import { taskOneCorrectionPrompt, taskOneModelPrompt, localTaskOneCorrectionPrompt } from './task-prompts.mjs';
 import { createCloudSettingsStore, validateCloudSettings, publicCloudSettings, CloudSettingsError } from './cloud-settings.mjs';
 import { createUpdater, UpdateError } from './updater.mjs';
+import { createWorkbuddyGateway } from './workbuddy-gateway.mjs';
+import { createWorkbuddyModelStore, workbuddyModelPayload, normalizeWorkbuddyModel } from './workbuddy-models.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -84,7 +86,7 @@ export async function getCodexStatus() {
 export async function getEngineStatus({ wait = true, refresh = false } = {}) {
   const status = await getProviderStatus();
   if (status.provider === 'codex') return { ...await getCodexStatus(), provider:'codex', selected:getProviderOverride() };
-  if (status.provider === 'workbuddy') return { ...await getWorkbuddyStatus({ wait, refresh }), provider:'workbuddy', selected:getProviderOverride(), loginScript: workbuddyLoginScript() };
+  if (status.provider === 'workbuddy') return { ...await getWorkbuddyStatus({ wait, refresh }), provider:'workbuddy', selected:getProviderOverride() };
   return status;
 }
 
@@ -154,11 +156,17 @@ function workbuddyEnv() {
 // 0 表示让系统分配空闲端口，避免与 WorkBuddy 桌面版或上一次会话的固定端口冲突。
 function workbuddyPort() { return 0; }
 
-// 项目自带的登录脚本；打包版可能没有，返回空字符串让页面只给文字步骤。
-export function workbuddyLoginScript() {
-  const script = path.join(ROOT, 'Login WorkBuddy.cmd');
-  return existsSync(script) ? script : '';
-}
+// 「一键连接」背后的进程：应用自己起 WorkBuddy 的本地网关，用户不需要找文件、敲命令。
+// 网关空闲十分钟自动退出，不会常驻占内存。
+const workbuddyModelStore = createWorkbuddyModelStore();
+const workbuddyGateway = createWorkbuddyGateway({
+  findCli: findWorkbuddyCli,
+  resolveLaunch: cliLaunch,
+  buildEnv: () => ({ ...workbuddyEnv(), NO_COLOR: '1' }),
+  cwd: os.tmpdir(),
+});
+// 退出时把这个子进程一起收走，避免留下没人管的 WorkBuddy 进程。
+process.on('exit', () => workbuddyGateway.stop());
 
 function workbuddyArgs({ schema, model, port, prompt }) {
   const args = ['-p', '--output-format', 'json', '--tools', '', '--permission-mode', 'dontAsk',
@@ -168,19 +176,9 @@ function workbuddyArgs({ schema, model, port, prompt }) {
   return args;
 }
 
-// 给出一条可以直接复制的登录命令，避免用户只看到“codebuddy”却不知道在哪运行。
-function workbuddyCommandHint(file) {
-  if (!file) return 'codebuddy';
-  if (/\.(?:mjs|cjs|js)$/iu.test(file) || /(?:^|[\\/])(?:codebuddy|cbc)$/iu.test(file)) return `node "${file}"`;
-  return `"${file}"`;
-}
-
 function workbuddyFailure(detail, file = '') {
   if (/authentication required|not logged in|please use\s*\/login|unauthorized|invalid api key/i.test(detail)) {
-    const script = workbuddyLoginScript();
-    // 有登录脚本时直接指路，别让人去抄一长串 node 命令。
-    if (script) return new HttpError(503, `WorkBuddy 还没有登录。请双击 ${script}，在打开的窗口里输入 /login 完成一次登录，然后回到页面点「我已登录，重新检查」。`);
-    return new HttpError(503, `WorkBuddy 命令行还没有登录。请在这台电脑打开 PowerShell 运行 ${workbuddyCommandHint(file)}，输入 /login 完成一次登录，然后回到页面重试。`);
+    return new HttpError(503, 'WorkBuddy 还没有登录，或者登录已经过期。回到页面点一下「一键连接」，在浏览器里登录一次就好，不需要输入任何命令。');
   }
   if (/ENOENT|spawn .* ENOENT|command not found/i.test(detail)) {
     return new HttpError(503, '找不到 WorkBuddy 命令行。请确认 WorkBuddy 已安装；如果装在非默认目录，请把环境变量 IELTS_WORKBUDDY_PATH 指向 resources/app.asar.unpacked/cli/bin/codebuddy 后重启软件。');
@@ -242,7 +240,7 @@ async function runWorkbuddy({ schema, prompt, workDir, signal, timeout = ANALYSI
     const failure = workbuddyFailure(output, file);
     if (failure) throw failure;
     if (execution.code !== 0) throw new HttpError(502, `WorkBuddy 分析失败（退出码 ${execution.code}）。请确认命令行可以正常启动后重试。`);
-    if (!execution.stdout.trim()) throw new HttpError(502, 'WorkBuddy 没有返回任何结果。请先在终端运行 codebuddy 并输入 /login 登录，再重试。');
+    if (!execution.stdout.trim()) throw new HttpError(502, 'WorkBuddy 没有返回任何结果。回到页面点「一键连接」确认登录状态后再试。');
     return parseWorkbuddyOutput(execution.stdout);
   }
   throw lastError || new HttpError(502, 'WorkBuddy 分析失败，请重试。');
@@ -251,28 +249,35 @@ async function runWorkbuddy({ schema, prompt, workDir, signal, timeout = ANALYSI
 let workbuddyStatusCache = { at: 0, value: null };
 let workbuddyProbe = null;
 
+// 登录成功的唯一可靠证据：WorkBuddy 命令行把账号令牌写进了用户目录。
+// 网关自报的 authenticated 在未登录时也会是 true，不能拿来当判断依据。
+function workbuddyCredentials() {
+  const home = os.homedir();
+  const candidates = [
+    path.join(home, '.credentials.json'),
+    path.join(home, '.credentials.v3.json'),
+    path.join(home, '.codebuddy', 'credentials.json'),
+    path.join(home, '.codebuddy', '.credentials.json'),
+  ];
+  // 有些安装会把配置目录指到别处，这里跟着环境变量一起找。
+  for (const dir of [process.env.CODEBUDDY_CONFIG_DIR, process.env.WORKBUDDY_CONFIG_DIR]) {
+    if (dir?.trim()) candidates.push(path.join(dir.trim(), 'credentials.json'), path.join(dir.trim(), '.credentials.json'));
+  }
+  return candidates.some(file => existsSync(file));
+}
+
 async function probeWorkbuddy() {
   const model = workbuddyModel();
   const engine = `WorkBuddy CLI · ${workbuddyModelLabel(model)}`;
   const remember = value => { workbuddyStatusCache = { at: Date.now(), value }; return value; };
   const file = await findWorkbuddyCli();
   if (!file) {
-    return remember({ available:false, engine:'WorkBuddy CLI', message:'未找到 WorkBuddy 命令行。请先安装 WorkBuddy 桌面版；装在其他目录时，用环境变量 IELTS_WORKBUDDY_PATH 指定 codebuddy 启动文件后重启软件。' });
+    return remember({ available:false, engine:'WorkBuddy CLI', needsInstall:true, message:'这台电脑上没有找到 WorkBuddy。装上 WorkBuddy 桌面版就能免密钥使用；也可以先用在线 AI。' });
   }
-  try {
-    const launch = await cliLaunch(file);
-    const execution = await runProcess(launch.command, [...launch.args, '-p', '--output-format', 'json', '--tools', '', '--permission-mode', 'dontAsk', '--no-session-persistence', '--port', String(workbuddyPort()), 'Reply with OK and nothing else.'], { timeout: 60000, maxOutput: 262144, env: workbuddyEnv(), spawnError: '无法启动 WorkBuddy 命令行。请确认安装完整，或用环境变量 IELTS_WORKBUDDY_PATH 指定 codebuddy 启动文件。' });
-    const output = `${execution.stderr}\n${execution.stdout}`;
-    const failure = workbuddyFailure(output, file);
-    if (failure) return remember({ available:false, engine, message: failure.message });
-    if (execution.code !== 0 || !execution.stdout.trim()) {
-      return remember({ available:false, engine, message: `WorkBuddy 命令行已找到，但这次检查没有通过：${(execution.stderr || execution.stdout || '').replace(/\s+/gu, ' ').slice(0, 160) || '没有返回结果，请先完成登录'}。` });
-    }
-    return remember({ available:true, engine, message:`已连接 WorkBuddy（${workbuddyModelLabel(model)}）。使用这台电脑上 WorkBuddy 已登录账号的额度，不需要 API 密钥。` });
-  } catch (error) {
-    if (error instanceof HttpError) return remember({ available:false, engine, message:error.message });
-    return remember({ available:false, engine, message:'无法启动 WorkBuddy 命令行，请确认安装完整后重试。' });
+  if (workbuddyCredentials()) {
+    return remember({ available:true, engine, canLogin:true, message:`已连接 WorkBuddy（${workbuddyModelLabel(model)}）。用的是这台电脑上已登录账号的额度，不需要 API 密钥。` });
   }
+  return remember({ available:false, engine, needsLogin:true, canLogin:true, message:'WorkBuddy 还没连接。点一下「一键连接」，用这台电脑上已登录的账号自动连上。' });
 }
 
 // wait=false 时先返回已有结果并在后台检查，避免页面顶部的状态栏被一次登录探测拖慢。
@@ -363,7 +368,7 @@ export async function analyzeWriting(input, { signal } = {}) {
             return normalize(await runWorkbuddy({ schema, prompt: prompt + validationNote, workDir, signal: controller.signal }));
           } catch (error) {
             if (error instanceof HttpError) throw error;
-            if (attempt === 1) throw new HttpError(502, `WorkBuddy 未能生成完整的正文和四项评分（已自动重试两次）。${engineNote()}请先在终端运行 codebuddy 并输入 /login 完成登录，或改用在「设置在线 AI」中配置的免费模型。你的原文已保留。`);
+            if (attempt === 1) throw new HttpError(502, `WorkBuddy 未能生成完整的正文和四项评分（已自动重试两次）。${engineNote()}请回到页面点「一键连接」确认 WorkBuddy 登录状态，或改用在「设置在线 AI」中配置的免费模型。你的原文已保留。`);
             validationNote = `\nValidation failed: ${error instanceof ValidationError ? error.message : 'Invalid or truncated JSON'}. Return a fresh complete JSON result. Each score must include ${task.criterion}, CC, LR, GRA exactly once; all bands and range bounds must be 0 to 9 in steps of 0.5. ${name === 'model' ? `Write a complete response of at least ${task.minimum} English words. Keep annotations concise.` : 'Keep only 3-6 well-supported issues and 2 expressions.'} Copy exact source quotes. Never return placeholders.\n`;
             continue;
           }
@@ -447,10 +452,13 @@ function assertLocalRequest(req) {
   if (req.headers['sec-fetch-site'] === 'cross-site') throw new HttpError(403, '不接受跨站请求。');
 }
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2' };
-export function createServer({ analyze = analyzeWriting, status = getEngineStatus, publicDir = PUBLIC, localAI: localAIOverride, cloudStore = createCloudSettingsStore(), probeCloud = testCloudConnection, updater = createUpdater(), shutdown = () => process.exit(0) } = {}) {
+export function createServer({ analyze = analyzeWriting, status = getEngineStatus, publicDir = PUBLIC, localAI: localAIOverride, cloudStore = createCloudSettingsStore(), probeCloud = testCloudConnection, updater = createUpdater(), shutdown = () => process.exit(0), workbuddy: workbuddyOverride, workbuddyModels: workbuddyModelsOverride } = {}) {
   let busy = false;
   let switching = false;
   const localAI = localAIOverride || createLocalAIManager();
+  // 允许注入：测试里用假的网关和临时目录，绝不动真实设置文件。
+  const wbGateway = workbuddyOverride || workbuddyGateway;
+  const wbModels = workbuddyModelsOverride || workbuddyModelStore;
   let cloudConfig = null;
   let cloudLoadError = '';
   const applyLocalConfig = () => {
@@ -461,6 +469,8 @@ export function createServer({ analyze = analyzeWriting, status = getEngineStatu
     cloudConfig = config;
     if (config) { setCloudConfig(config); setProviderOverride(config.selectedProvider || 'openai-compatible'); }
   }).catch(() => { cloudLoadError = '本机在线 AI 设置无法读取，请重新配置。'; });
+  // 上次选的 WorkBuddy 模型跟着应用一起恢复。
+  void Promise.resolve(wbModels.read?.()).then(model => { if (model) setWorkbuddyModel(model); }).catch(() => { /* 读不到就用默认模型。 */ });
   // 仅恢复用户已完整安装的本地引擎；首次打开不下载，在线模式不启动本地模型。
   void initialized.then(async () => {
     if (['auto', 'ollama'].includes(getProviderOverride())) {
@@ -581,6 +591,38 @@ export function createServer({ analyze = analyzeWriting, status = getEngineStatu
           // 用户刚切到 WorkBuddy 时往往才去登录，必须丢开缓存重新探测，否则会连续 5 分钟显示未登录。
           return sendJson(res, 200, await status({ refresh: body.provider === 'workbuddy' }));
         } finally { switching = false; }
+      }
+      // WorkBuddy 的连接管理：全在应用里完成，用户不需要知道命令行在哪。
+      if (url.pathname === '/api/workbuddy' && req.method === 'GET') {
+        const payload = workbuddyModelPayload(workbuddyModel());
+        const installed = Boolean(await findWorkbuddyCli());
+        return sendJson(res, 200, {
+          ...payload,
+          installed,
+          connected: installed && workbuddyCredentials(),
+          ...installed ? {} : { error:'这台电脑上没有找到 WorkBuddy，装上桌面版后就能免密钥使用。' },
+        });
+      }
+      // 一键登录：由应用向 WorkBuddy 要一个官方登录链接，页面直接打开它。
+      if (url.pathname === '/api/workbuddy/login' && req.method === 'POST') {
+        if (!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] || '')) throw new HttpError(415, '请使用 JSON 格式提交。');
+        try {
+          const { authUrl } = await wbGateway.login();
+          return sendJson(res, 200, { authUrl });
+        } catch (error) {
+          throw new HttpError(error?.code === 'missing' ? 503 : 502, error?.message || '没能打开 WorkBuddy 登录，请重试。');
+        }
+      }
+      if (url.pathname === '/api/workbuddy/model' && req.method === 'POST') {
+        if (!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] || '')) throw new HttpError(415, '请使用 JSON 格式提交。');
+        const body = await readBody(req, 8 * 1024);
+        const model = normalizeWorkbuddyModel(body?.model);
+        if (!model) throw new HttpError(400, '模型名称不合法，请从列表里选一个。');
+        await wbModels.write(model);
+        setWorkbuddyModel(model);
+        // 换了模型，顶部那句「已连接 · xxx」也要跟着变。
+        workbuddyStatusCache = { at: 0, value: null };
+        return sendJson(res, 200, workbuddyModelPayload(model));
       }
       if (url.pathname === '/api/analyze' && req.method === 'POST') {
         if (!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] || '')) throw new HttpError(415, '请使用 JSON 格式提交。');

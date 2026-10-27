@@ -1211,3 +1211,58 @@ h1 { letter-spacing: -1.25px; }
 .expression-detail .expression-detail-meaning { margin-top: 6px; color: #74826b; font-size: 14px; line-height: 1.8; }
 .expression-detail .expression-detail-usage { margin-top: 11px; color: #909b89; font-size: 13px; line-height: 1.85; }
 .expression-detail .expression-detail-example { margin-top: 13px; padding: 11px 14px; background: #f6f9f1; border-left: 3px solid #c6dbb0; border-radius: 0 9px 9px 0; color: #46594a; font-family: var(--font-essay); font-size: 15px; line-height: 1.8; overflow-wrap: anywhere; }
+
+/* WorkBuddy 连接面板：只有三件事——状态、一个按钮、模型选择。 */
+.wb-lead { margin: 0; color: #6f7d70; font-size: 13px; line-height: 1.85; }
+.wb-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 13px 15px;
+  background: #f8faf5;
+  border: 1px solid #e5ebe0;
+  border-radius: 12px;
+}
+.wb-status > div { min-width: 0; }
+.wb-status strong { display: block; color: #43594a; font-size: 13px; font-weight: 600; line-height: 1.6; }
+.wb-status > div > span { display: block; margin-top: 2px; color: #8b978c; font-size: 12px; line-height: 1.75; }
+.wb-status-dot { flex-shrink: 0; width: 8px; height: 8px; margin-top: 7px; background: #c9d3c3; border-radius: 50%; }
+.wb-status.is-on { background: #f1f8f0; border-color: #cfe3d2; }
+.wb-status.is-on strong { color: #2e6042; }
+.wb-status.is-on .wb-status-dot { background: #4f9a68; box-shadow: 0 0 0 4px #e1f0e2; }
+.wb-status.is-busy { background: #f7f9f3; border-color: #dfe7d6; }
+.wb-spinner {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  margin-top: 5px;
+  border: 2px solid #d3e0c8;
+  border-top-color: #5d8a62;
+  border-radius: 50%;
+  animation: wb-spin .8s linear infinite;
+}
+@keyframes wb-spin { to { transform: rotate(360deg); } }
+.wb-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 15px; }
+.wb-actions .btn { flex: 0 0 auto; }
+.btn-connect { min-height: 44px; padding: 0 24px; font-size: 14px; font-weight: 600; letter-spacing: .3px; }
+.wb-hint { margin: 10px 0 0; color: #9aa596; font-size: 11.5px; line-height: 1.8; }
+.wb-models { margin-top: 18px; padding-top: 16px; border-top: 1px solid #eef2ea; }
+.wb-models label { display: block; margin-bottom: 7px; color: #5b6f5c; font-size: 12px; font-weight: 600; letter-spacing: .2px; }
+.wb-models select {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 11px;
+  color: var(--ink);
+  background: var(--surface, white);
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  font-size: 13px;
+}
+.wb-models select:focus-visible { border-color: #9dba82; box-shadow: 0 0 0 3px #eaf2e2; outline: none; }
+.wb-model-note { margin: 7px 0 0; color: #98a393; font-size: 11.5px; line-height: 1.75; }
+
+@media (max-width: 639px) {
+  .wb-actions { flex-direction: column; align-items: stretch; }
+  .wb-actions .btn { width: 100%; justify-content: center; }
+  .btn-connect { min-height: 46px; }
+}

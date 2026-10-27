@@ -1,6 +1,6 @@
 # IELTS Writing Studio · 句进
 
-> v0.4.1 replaces the cloze/recall drills with sentence-pattern transfer practice: each pattern shows its skeleton and the original sentence, and you write three new sentences on three different topics. Grading runs locally and only checks three things — is the pattern there, is the sentence complete, is it your own content. The word bank moved directly under the writing area. The WorkBuddy CLI provider and free-tier presets from 0.4.0 are unchanged. The published installer is still v0.3.0.
+> v0.4.2 makes WorkBuddy a one-click connection: pick "WorkBuddy 账号" in the header, press the button, finish the official login page in your browser, and the panel flips to connected by itself — no terminal, no .cmd file, no typing /login. Once connected you can pick from 23 models in the same panel. The sentence-pattern practice from 0.4.1 is unchanged. The published installer is still v0.3.0.
 
 [简体中文](README.md) · [Download v0.2.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.2.0) · [Changelog](CHANGELOG.md)
 

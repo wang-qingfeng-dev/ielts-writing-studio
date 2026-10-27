@@ -130,8 +130,10 @@ test('GET /api/provider?refresh=1 asks for a fresh probe instead of the cached s
 
 test('the gateway spawn environment forces the lite bundle and strips proxy variables', () => {
   const previous = { proxy: process.env.HTTPS_PROXY, lite: process.env.CODEBUDDY_FORCE_LITE_WB_BUNDLE };
+  const previousSession = process.env.CODEBUDDY_SESSION_ID;
   process.env.HTTPS_PROXY = 'http://127.0.0.1:7890';
   process.env.https_proxy = 'http://127.0.0.1:7890';
+  process.env.CODEBUDDY_SESSION_ID = 'session-from-another-window';
   delete process.env.CODEBUDDY_FORCE_LITE_WB_BUNDLE;
   try {
     const env = workbuddyEnv();
@@ -140,8 +142,11 @@ test('the gateway spawn environment forces the lite bundle and strips proxy vari
     assert.equal(env.HTTPS_PROXY, undefined, '代理变量会让命令行启动阶段报 setProxy 错误');
     assert.equal(env.https_proxy, undefined, '小写副本也要一起清掉');
     assert.equal(env.NO_PROXY, '*');
+    // 带着别的会话 id 时命令行会把自己当成子会话，静默退出、一个字都不输出。
+    assert.equal(env.CODEBUDDY_SESSION_ID, undefined);
   } finally {
     if (previous.proxy === undefined) delete process.env.HTTPS_PROXY; else process.env.HTTPS_PROXY = previous.proxy;
     if (previous.lite === undefined) delete process.env.CODEBUDDY_FORCE_LITE_WB_BUNDLE; else process.env.CODEBUDDY_FORCE_LITE_WB_BUNDLE = previous.lite;
+    if (previousSession === undefined) delete process.env.CODEBUDDY_SESSION_ID; else process.env.CODEBUDDY_SESSION_ID = previousSession;
   }
 });

@@ -34,6 +34,25 @@ function unwrap(payload) {
   return payload;
 }
 
+// 网关开过网页版之后会启用一层「来源校验」：没带自家请求头一律 403，
+// 返回体是 {"error":"Missing required header: x-codebuddy-request"}。
+// 官方前端一直带着这个头，所以只在真实用户机器上（打开过网页登录）才会炸。
+// 这里始终带上；万一将来换成别的头名，再从 403 的报错里把名字读出来补一次。
+const SECURITY_HEADER = 'x-codebuddy-request';
+
+export function missingHeaderName(text) {
+  const match = /Missing required header:\s*([A-Za-z0-9_-]+)/u.exec(String(text || ''));
+  return match ? match[1] : '';
+}
+
+export function describeBlocked(status, payload, text) {
+  const message = payload?.error?.message || payload?.message || (typeof payload?.error === 'string' ? payload.error : '');
+  const header = missingHeaderName(text);
+  if (header) return `WorkBuddy 的本地接口要求额外的校验头（${header}），这次没能通过。请把软件更新到最新版；急用的话先切到免费在线 AI。`;
+  if (status === 403) return 'WorkBuddy 拒绝了这次连接（可能账号权限或版本不匹配）。可以重试一次，或先改用免费在线 AI。';
+  return message || `网关返回 ${status}`;
+}
+
 // 子进程失败时 stderr 往往是一整段 Node 堆栈；挑一句有用的，别把安装路径和栈甩给用户。
 export function summarizeFailure(text) {
   const lines = String(text || '')
@@ -175,34 +194,45 @@ export function createWorkbuddyGateway(options = {}) {
 
   async function request(pathname, { method = 'GET', body, timeout = 20000 } = {}) {
     const active = await ensure();
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeout);
-    timer.unref?.();
-    try {
-      const response = await fetchImpl(`http://127.0.0.1:${active.port}${pathname}`, {
-        method,
-        headers: {
-          Authorization: `Bearer ${active.password}`,
-          ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
-        },
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: controller.signal,
-      });
-      const text = await response.text();
-      let payload = null;
-      try { payload = text ? JSON.parse(text) : null; } catch { payload = { raw: text }; }
-      touch();
-      if (!response.ok) {
-        const reason = payload?.error?.message || payload?.message || `网关返回 ${response.status}`;
-        throw new GatewayError(reason, { code: response.status === 401 ? 'unauthorized' : 'http', detail: reason });
+    const base = {
+      Authorization: `Bearer ${active.password}`,
+      [SECURITY_HEADER]: '1',
+      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+    };
+    let headers = base;
+    for (let attempt = 0; ; attempt += 1) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeout);
+      timer.unref?.();
+      try {
+        const response = await fetchImpl(`http://127.0.0.1:${active.port}${pathname}`, {
+          method,
+          headers,
+          body: body === undefined ? undefined : JSON.stringify(body),
+          signal: controller.signal,
+        });
+        const text = await response.text();
+        let payload = null;
+        try { payload = text ? JSON.parse(text) : null; } catch { payload = { raw: text }; }
+        touch();
+        if (!response.ok) {
+          // 只对「缺少校验头」重试一次：把报错里点名的头补上再试，比自己猜头名靠谱。
+          const missing = response.status === 403 ? missingHeaderName(text) : '';
+          if (missing && attempt < 2 && headers[missing] !== '1') {
+            headers = { ...headers, [missing]: '1' };
+            continue;
+          }
+          const reason = describeBlocked(response.status, payload, text);
+          throw new GatewayError(reason, { code: response.status === 401 ? 'unauthorized' : response.status === 403 ? 'blocked' : 'http', detail: reason });
+        }
+        return payload;
+      } catch (error) {
+        if (error instanceof GatewayError) throw error;
+        if (error?.name === 'AbortError') throw new GatewayError('WorkBuddy 响应超时，请重试。', { code: 'timeout' });
+        throw new GatewayError(`没能连上 WorkBuddy：${error.message}`, { code: 'network' });
+      } finally {
+        clearTimeout(timer);
       }
-      return payload;
-    } catch (error) {
-      if (error instanceof GatewayError) throw error;
-      if (error?.name === 'AbortError') throw new GatewayError('WorkBuddy 响应超时，请重试。', { code: 'timeout' });
-      throw new GatewayError(`没能连上 WorkBuddy：${error.message}`, { code: 'network' });
-    } finally {
-      clearTimeout(timer);
     }
   }
 

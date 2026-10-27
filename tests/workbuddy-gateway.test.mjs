@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { parseGatewayBanner, createWorkbuddyGateway, GatewayError, summarizeFailure, describeExit } from '../workbuddy-gateway.mjs';
+import { parseGatewayBanner, createWorkbuddyGateway, GatewayError, summarizeFailure, describeExit, missingHeaderName, describeBlocked } from '../workbuddy-gateway.mjs';
 
 const BANNER = `mods: loaded mod "subscription-gate" from .codebuddy-plugin (tier user, hooks: prompt.submit)
   CodeBuddy Code HTTP Server
@@ -155,4 +155,76 @@ test('a missing bundle is explained in plain words instead of a stack trace', as
   assert.match(describeExit(1, summarizeFailure(stderr)), /命令行组件不完整/u);
   assert.doesNotMatch(describeExit(1, summarizeFailure(stderr)), /Require stack/u);
   assert.match(describeExit(2, 'boom'), /退出码 2/u);
+});
+
+test('every gateway call carries the security header the local server expects', async () => {
+  const child = fakeChild();
+  const fetchImpl = fakeFetch(() => ({ body: { data: { authenticated: true } } }));
+  const gateway = createWorkbuddyGateway({
+    findCli: async () => 'C:/fake/codebuddy',
+    resolveLaunch: async () => ({ command: 'node', args: ['cli.js'] }),
+    spawnImpl: () => { setImmediate(() => child.stdout.emit('data', BANNER)); return child; },
+    fetchImpl,
+    idleTimeout: 0,
+  });
+  await gateway.accountStatus();
+  // 打开过网页版之后，网关会要求这个头，缺了就 403——用户的真实机器上就是这么炸的。
+  assert.equal(fetchImpl.calls[0].headers['x-codebuddy-request'], '1');
+  gateway.stop();
+});
+
+test('a 403 that names the missing header is retried once with that header', async () => {
+  const child = fakeChild();
+  let attempt = 0;
+  const fetchImpl = fakeFetch((url, options) => {
+    attempt += 1;
+    if (!options.headers['x-codebuddy-request']) {
+      return { status: 403, body: { error: 'Missing required header: x-codebuddy-request' } };
+    }
+    return { body: { data: { success: true, authUrl: 'https://www.workbuddy.cn/login?state=ok' } } };
+  });
+  const gateway = createWorkbuddyGateway({
+    findCli: async () => 'C:/fake/codebuddy',
+    resolveLaunch: async () => ({ command: 'node', args: ['cli.js'] }),
+    spawnImpl: () => { setImmediate(() => child.stdout.emit('data', BANNER)); return child; },
+    fetchImpl,
+    idleTimeout: 0,
+  });
+  const result = await gateway.login();
+  assert.equal(result.authUrl, 'https://www.workbuddy.cn/login?state=ok');
+  assert.equal(attempt, 1, '第一次就带了头，不该重试');
+  gateway.stop();
+});
+
+test('a header name this build does not know is still recovered from the 403 body', async () => {
+  const child = fakeChild();
+  const seen = [];
+  const fetchImpl = fakeFetch((url, options) => {
+    seen.push(options.headers);
+    if (!options.headers['x-codebuddy-request-v2']) {
+      return { status: 403, body: { error: 'Missing required header: x-codebuddy-request-v2' } };
+    }
+    return { body: { data: { authenticated: true } } };
+  });
+  const gateway = createWorkbuddyGateway({
+    findCli: async () => 'C:/fake/codebuddy',
+    resolveLaunch: async () => ({ command: 'node', args: ['cli.js'] }),
+    spawnImpl: () => { setImmediate(() => child.stdout.emit('data', BANNER)); return child; },
+    fetchImpl,
+    idleTimeout: 0,
+  });
+  const status = await gateway.accountStatus();
+  assert.equal(status.authenticated, true);
+  assert.equal(seen.length, 2);
+  assert.equal(seen[1]['x-codebuddy-request-v2'], '1');
+  gateway.stop();
+});
+
+test('a 403 never reaches the user as a bare status code', () => {
+  assert.equal(missingHeaderName('{"error":"Missing required header: x-codebuddy-request"}'), 'x-codebuddy-request');
+  assert.equal(missingHeaderName(''), '');
+  const text = describeBlocked(403, { error: 'Missing required header: x-codebuddy-request' }, '{"error":"Missing required header: x-codebuddy-request"}');
+  assert.match(text, /校验头/u);
+  assert.doesNotMatch(text, /403/u);
+  assert.equal(describeBlocked(500, { error: { message: 'boom' } }, ''), 'boom');
 });

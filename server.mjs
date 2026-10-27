@@ -150,6 +150,10 @@ export function workbuddyEnv() {
   const env = { ...process.env, NO_COLOR: '1' };
   for (const key of ['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'http_proxy', 'https_proxy', 'all_proxy', 'npm_config_proxy', 'npm_config_https_proxy']) delete env[key];
   env.NO_PROXY = '*'; env.no_proxy = '*';
+  // 如果本软件是从另一个 CodeBuddy 会话里启动的（终端、脚本、自动化），命令行会继承那个
+  // 会话的 id，把自己当成「子会话」直接静默退出：退出码 0、一个字都不输出，看起来像没登录。
+  // 这个 id 只对本进程的父子关系有意义，传给子进程只会误伤。
+  for (const key of ['CODEBUDDY_SESSION_ID', 'CODEBUDDY_CONVERSATION_MESSAGE_ID']) delete env[key];
   // 当前版 WorkBuddy 的安装包只带精简网关产物（dist/codebuddy-lite-wb.mjs）。
   // 不设这个变量时 `--serve` 会去 require 不存在的完整包，直接报 MODULE_NOT_FOUND——
   // 在 WorkBuddy 桌面版里点过的人没事，因为它自己的环境带着这个变量；双击启动就翻车。
@@ -271,6 +275,26 @@ function workbuddyCredentials() {
   return candidates.some(file => existsSync(file));
 }
 
+// 登录状态以 WorkBuddy 自己为准：新版把账号态托管在网关里，不一定写成本地凭证文件。
+// 只看文件会把「明明已经登录」判成未连接，用户就一直卡在登录弹窗里出不来。
+// 探测要限时：命令行起不来时不能让页面干等 45 秒，超时就退回文件探测。
+function withTimeout(promise, ms) {
+  let timer;
+  const guard = new Promise((resolve, reject) => {
+    timer = setTimeout(() => reject(new Error('timeout')), ms);
+    timer.unref?.();
+  });
+  return Promise.race([promise, guard]).finally(() => clearTimeout(timer));
+}
+
+async function workbuddyConnected(gateway = workbuddyGateway) {
+  try {
+    const status = await withTimeout(gateway.accountStatus(), 25000);
+    if (status?.authenticated) return true;
+  } catch { /* 网关起不来时退回文件探测。 */ }
+  return workbuddyCredentials();
+}
+
 async function probeWorkbuddy() {
   const model = workbuddyModel();
   const engine = `WorkBuddy CLI · ${workbuddyModelLabel(model)}`;
@@ -279,7 +303,7 @@ async function probeWorkbuddy() {
   if (!file) {
     return remember({ available:false, engine:'WorkBuddy CLI', needsInstall:true, message:'这台电脑上没有找到 WorkBuddy。装上 WorkBuddy 桌面版就能免密钥使用；也可以先用在线 AI。' });
   }
-  if (workbuddyCredentials()) {
+  if (await workbuddyConnected()) {
     return remember({ available:true, engine, canLogin:true, message:`已连接 WorkBuddy（${workbuddyModelLabel(model)}）。用的是这台电脑上已登录账号的额度，不需要 API 密钥。` });
   }
   return remember({ available:false, engine, needsLogin:true, canLogin:true, message:'WorkBuddy 还没连接。点一下「一键连接」，用这台电脑上已登录的账号自动连上。' });
@@ -604,7 +628,7 @@ export function createServer({ analyze = analyzeWriting, status = getEngineStatu
         return sendJson(res, 200, {
           ...payload,
           installed,
-          connected: installed && workbuddyCredentials(),
+          connected: installed && await workbuddyConnected(wbGateway),
           ...installed ? {} : { error:'这台电脑上没有找到 WorkBuddy，装上桌面版后就能免密钥使用。' },
         });
       }
@@ -613,6 +637,8 @@ export function createServer({ analyze = analyzeWriting, status = getEngineStatu
         if (!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] || '')) throw new HttpError(415, '请使用 JSON 格式提交。');
         try {
           const { authUrl } = await wbGateway.login();
+          // 登录链接拿到了，说明这台机器上其实已经能跟 WorkBuddy 通信；顺手把缓存清掉。
+          workbuddyStatusCache = { at: 0, value: null };
           return sendJson(res, 200, { authUrl });
         } catch (error) {
           throw new HttpError(error?.code === 'missing' ? 503 : 502, error?.message || '没能打开 WorkBuddy 登录，请重试。');

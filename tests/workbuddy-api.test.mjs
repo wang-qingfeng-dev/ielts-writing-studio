@@ -104,3 +104,22 @@ test('the login endpoint refuses a non-JSON body', async t => {
   const response = await fetch(`${base}/api/workbuddy/login`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'x' });
   assert.equal(response.status, 415);
 });
+
+test('GET /api/workbuddy trusts the gateway account state even without a credential file', async t => {
+  const previous = process.env.IELTS_WORKBUDDY_PATH;
+  process.env.IELTS_WORKBUDDY_PATH = path.join(os.tmpdir(), 'fake-codebuddy');
+  t.after(() => {
+    if (previous === undefined) delete process.env.IELTS_WORKBUDDY_PATH;
+    else process.env.IELTS_WORKBUDDY_PATH = previous;
+  });
+  // 新版 WorkBuddy 把登录态托管在网关里，本机找不到 credentials 文件。
+  // 只按文件判断会把已登录的机器判成未连接，用户就一直卡在登录弹窗。
+  const gateway = {
+    login: async () => ({ authUrl: 'https://www.workbuddy.cn/login?state=x' }),
+    accountStatus: async () => ({ authenticated: true, account: { userId: 'u-1', name: '' } }),
+    stop() {},
+  };
+  const { base } = await withServer(t, { gateway });
+  const body = await (await fetch(`${base}/api/workbuddy`)).json();
+  assert.equal(body.connected, true);
+});

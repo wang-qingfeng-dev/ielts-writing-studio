@@ -405,8 +405,13 @@ let workbuddyPoll = 0;
 let workbuddyAuthUrl = '';
 let workbuddyInfo = null;
 
+// 服务端升级后旧进程可能还在跑，这时所有新接口都会 404；
+// 直接把「接口不存在」翻成人话，免得用户以为功能坏了。
+const STALE_APP_HINT = '应用还在用旧版本运行。关掉这个页面，重新双击「Start Writing Studio」启动一次就好。';
+
 async function loadWorkbuddy() {
   const response = await fetch('/api/workbuddy', { signal: AbortSignal.timeout(60000) });
+  if (response.status === 404) throw new Error(STALE_APP_HINT);
   const result = await response.json();
   if (!response.ok && !result?.models) throw new Error(result.error || 'WorkBuddy 状态读取失败。');
   workbuddyInfo = result;
@@ -489,6 +494,7 @@ async function startWorkbuddyLogin() {
       signal: AbortSignal.timeout(90000),
     });
     const result = await response.json();
+    if (response.status === 404) throw new Error(STALE_APP_HINT);
     if (!response.ok) throw new Error(result.error || '没能打开 WorkBuddy 登录页。');
     workbuddyAuthUrl = result.authUrl;
     // 先同步开好窗口再赋值地址，避免被浏览器当成弹出广告拦掉。

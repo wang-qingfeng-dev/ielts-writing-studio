@@ -53,6 +53,29 @@ try {
     } catch {}
 }
 
+# 覆盖升级后旧实例往往还在后台跑（页面能开、但新接口全部 404）。
+# 这里比对磁盘上的版本号，不一致就把旧实例停掉，换成这次启动的版本。
+$studioDiskVersion = $null
+$studioManifestPath = Join-Path $studioRoot 'package.json'
+if (Test-Path -LiteralPath $studioManifestPath) {
+    try {
+        $studioDiskVersion = (Get-Content -LiteralPath $studioManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json).version
+    } catch { $studioDiskVersion = $null }
+}
+if ($studioReachable -and $studioDiskVersion -and $studioIdentity.version -and $studioIdentity.version -ne $studioDiskVersion) {
+    $studioStalePid = 0
+    [void][int]::TryParse([string]$studioIdentity.pid, [ref]$studioStalePid)
+    if ($studioStalePid -gt 0) {
+        Write-Host "发现旧版本 v$($studioIdentity.version) 还在运行，正在切换到 v$studioDiskVersion…"
+        Stop-Process -Id $studioStalePid -ErrorAction SilentlyContinue
+        for ($studioTry = 0; $studioTry -lt 40; $studioTry++) {
+            Start-Sleep -Milliseconds 150
+            try { Invoke-RestMethod -Uri "$studioUrl/api/app-info" -TimeoutSec 1 | Out-Null } catch { break }
+        }
+    }
+    $studioReachable = $false
+}
+
 if (-not $studioReachable) {
     $studioConfiguredCodex = & $studioNodePath @studioEnvArgs -e 'process.stdout.write(process.env.IELTS_CODEX_PATH||String())'
     $studioCodex = Get-Command codex.exe -ErrorAction SilentlyContinue
@@ -69,6 +92,11 @@ if (-not $studioReachable) {
         }
     }
     $studioServerPath = Join-Path $studioRoot 'server.mjs'
+    # 有些终端会同时设置 HTTP_PROXY 和 http_proxy；Windows PowerShell 的 Start-Process
+    # 按大小写不敏感的方式重建环境变量字典，遇到这种重复会直接抛异常，先去掉小写副本。
+    foreach ($studioProxyName in 'http_proxy','https_proxy','all_proxy','no_proxy') {
+        if (Test-Path "Env:$studioProxyName") { Remove-Item "Env:$studioProxyName" -ErrorAction SilentlyContinue }
+    }
     # Start-Process 会把 ArgumentList 的元素再次按空格拆分；服务路径必须显式加引号，安装目录可以包含空格或中文。
     $studioServerArgs = @($studioEnvArgs | ForEach-Object { '"' + $_ + '"' })
     $studioServerArgs += '"' + $studioServerPath + '"'

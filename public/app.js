@@ -436,17 +436,21 @@ function workbuddyModelBlock(info) {
   </div>`;
 }
 
+// WorkBuddy 接入还在灰度测试，能不能连上取决于账号，写清楚比反复修“一键连接”更诚实。
+const WB_BETA_TAG = '<span class="wb-tag">测试中</span>';
+const WB_BETA_NOTE = 'WorkBuddy 接入还在测试中，目前只对部分账号开放，不是所有人都能连上。';
+
 function workbuddyPanel(info) {
   if (info?.installed === false) {
-    return `<p class="wb-lead">这台电脑上没有找到 WorkBuddy。装上 WorkBuddy 桌面版之后，回来点一次就能连上。</p>
+    return `<p class="wb-lead">这台电脑上没有找到 WorkBuddy。${WB_BETA_NOTE}想试的话，先装上 WorkBuddy 桌面版再回来。</p>
       <div class="wb-actions"><button class="btn btn-primary" type="button" data-workbuddy="free">改用免费在线 AI</button></div>`;
   }
   const status = info?.connected
-    ? `<div class="wb-status is-on"><span class="wb-status-dot" aria-hidden="true"></span><div><strong>已连接</strong><span>用的是这台电脑上 WorkBuddy 已登录账号的额度，不另外收费。</span></div></div>
+    ? `<div class="wb-status is-on"><span class="wb-status-dot" aria-hidden="true"></span><div><strong>已连接${WB_BETA_TAG}</strong><span>用的是这台电脑上 WorkBuddy 已登录账号的额度，不另外收费。测试阶段偶尔会连不上，连不上就用免费在线 AI。</span></div></div>
        <div class="wb-actions"><button class="btn btn-secondary btn-small" type="button" data-workbuddy="connect">重新登录</button><button class="btn btn-ghost btn-small" type="button" data-workbuddy="free">改用免费在线 AI</button></div>`
-    : `<div class="wb-status"><span class="wb-status-dot" aria-hidden="true"></span><div><strong>还没连接</strong><span>下面这个按钮会打开 WorkBuddy 官方登录页，登录完自动回到这里。</span></div></div>
-       <div class="wb-actions"><button class="btn btn-primary btn-connect" type="button" data-workbuddy="connect">一键连接 WorkBuddy</button></div>
-       <p class="wb-hint">不用密钥，不用找文件，也不用打开黑窗口。</p>`;
+    : `<div class="wb-status"><span class="wb-status-dot" aria-hidden="true"></span><div><strong>还没连接${WB_BETA_TAG}</strong><span>${WB_BETA_NOTE}点下面的按钮会打开 WorkBuddy 官方登录页；登录完没变成「已连接」，说明这次没轮到你，换免费在线 AI 一样能批改。</span></div></div>
+       <div class="wb-actions"><button class="btn btn-primary btn-connect" type="button" data-workbuddy="connect">尝试连接 WorkBuddy</button><button class="btn btn-ghost btn-small" type="button" data-workbuddy="free">改用免费在线 AI</button></div>
+       <p class="wb-hint">测试功能：连不上不是你的操作有问题，也不用再试很多次。</p>`;
   return `${status}${workbuddyModelBlock(info)}`;
 }
 
@@ -461,19 +465,21 @@ function renderWorkbuddyWaiting() {
   panel.innerHTML = `<div class="wb-status is-busy"><span class="wb-spinner" aria-hidden="true"></span><div><strong>已经打开登录页</strong><span>在浏览器里登录你的 WorkBuddy 账号，完成后这里会自动变成「已连接」。</span></div></div>
     <div class="wb-actions">
       ${workbuddyAuthUrl ? `<button class="btn btn-secondary btn-small" type="button" data-workbuddy="reopen">再打开一次登录页</button>` : ''}
+      <button class="btn btn-ghost btn-small" type="button" data-workbuddy="free">改用免费在线 AI</button>
       <button class="btn btn-ghost btn-small" type="button" data-workbuddy="cancel">先不连了</button>
     </div>
-    <p class="wb-hint">登录页没弹出来？点上面的「再打开一次登录页」即可。这一步只做一次。</p>`;
+    <p class="wb-hint">登录页没弹出来？点上面的「再打开一次登录页」。测试阶段有些账号登录完也连不上，那就先用免费在线 AI。</p>`;
 }
 
 async function openWorkbuddyConnect() {
-  openModal('连接 WorkBuddy', '<div id="workbuddy-panel"><p class="wb-lead">正在检查这台电脑上的 WorkBuddy…</p></div>', '');
+  openModal('连接 WorkBuddy（测试功能）', '<div id="workbuddy-panel"><p class="wb-lead">正在检查这台电脑上的 WorkBuddy…</p></div>', '');
   try {
     const info = await loadWorkbuddy();
     renderWorkbuddyPanel(info);
   } catch (error) {
     const panel = $('#workbuddy-panel');
     if (panel) panel.innerHTML = `<p class="wb-lead">${e(error.message || '没能读取 WorkBuddy 状态。')}</p>
+      <p class="wb-hint">${e(WB_BETA_NOTE)}</p>
       <div class="wb-actions"><button class="btn btn-secondary" type="button" data-workbuddy="retry">再试一次</button><button class="btn btn-ghost" type="button" data-workbuddy="free">改用免费在线 AI</button></div>`;
   }
 }
@@ -506,6 +512,7 @@ async function startWorkbuddyLogin() {
     if (opened && !opened.closed) opened.close();
     const panel = $('#workbuddy-panel');
     if (panel) panel.innerHTML = `<p class="wb-lead">${e(error.message || '没能打开 WorkBuddy 登录页。')}</p>
+      <p class="wb-hint">${e(WB_BETA_NOTE)}</p>
       <div class="wb-actions"><button class="btn btn-secondary" type="button" data-workbuddy="connect">再试一次</button><button class="btn btn-ghost" type="button" data-workbuddy="free">改用免费在线 AI</button></div>`;
   }
 }
@@ -526,8 +533,9 @@ function scheduleWorkbuddyPoll(startedAt) {
 function renderWorkbuddyTimeout() {
   const panel = $('#workbuddy-panel');
   if (!panel) return;
-  panel.innerHTML = `<p class="wb-lead">还没有检测到登录完成。如果登录页已经显示成功，点下面「我已经登录好了」；如果没登录成功，就再连一次。</p>
-    <div class="wb-actions"><button class="btn btn-primary" type="button" data-workbuddy="recheck">我已经登录好了</button><button class="btn btn-ghost btn-small" type="button" data-workbuddy="connect">再连一次</button></div>`;
+  panel.innerHTML = `<p class="wb-lead">还没有检测到登录完成。如果登录页已经显示成功，点下面「我已经登录好了」。</p>
+    <p class="wb-hint">${e(WB_BETA_NOTE)}这次连不上可以先换免费在线 AI，不影响批改。</p>
+    <div class="wb-actions"><button class="btn btn-primary" type="button" data-workbuddy="recheck">我已经登录好了</button><button class="btn btn-ghost" type="button" data-workbuddy="free">改用免费在线 AI</button></div>`;
 }
 
 async function onWorkbuddyConnected() {
@@ -546,7 +554,7 @@ async function onWorkbuddyConnected() {
     const info = await loadWorkbuddy();
     renderWorkbuddyPanel(info);
   } catch { renderWorkbuddyPanel({ ...(workbuddyInfo || {}), connected: true }); }
-  toast('WorkBuddy 已连接，可以开始分析了。');
+  toast('WorkBuddy 已连接（测试功能），可以开始分析了。');
 }
 
 async function saveWorkbuddyModel(model) {
@@ -738,7 +746,7 @@ function exportNotes() {
   toast('学习笔记已导出，包含三篇作文、评分和复习内容。');
 }
 function showAbout() {
-  openModal('写作工作台 · 使用与评分说明',`<div class="about-content"><h3>一次练习，走完一个学习闭环</h3><ol><li>选择题型并粘贴完整题目。Task 1 建议 20 分钟、150 词；Task 2 建议 40 分钟、250 词。学术类 Task 1 还需填写原图数据或流程/地图描述。</li><li>点击「开始分析」，先看三个重点，再点击原文和精修版的高亮。</li><li>中栏保留观点做必要修改；右栏只根据题目独立创作，可按需展开。</li><li>先看「本篇好词好句」：句式卡给骨架，表达卡给现成搭配，都带原句和出处。</li><li>点「照着写一句」进句式仿写：同一个句式换三个不同话题各写一句。判分只看三件事——句式是否用上、句子是否完整、是否换成了自己的内容，全部在本机完成，不消耗 AI 额度。错题可以只练那几条。</li></ol><h3>评分怎么看</h3><p>Task 1 使用任务完成度 TA，Task 2 使用任务回应 TR；其余三项为连贯与衔接 CC、词汇资源 LR、语法多样性与准确性 GRA。单篇四项等权，展示 AI 参考区间与文本证据。</p><p>这是练习估分，不能替代正式考试结果。语法修正不一定改善论证，范文也不会自动获得满分。这里评估单篇作文，不计算整场 Writing 总成绩。</p><h3>关于保存与 AI</h3><p>草稿、最近 30 篇练习和复习卡保存在当前浏览器。清除浏览器数据会移除这些记录，请通过「导出学习笔记」备份。</p><p>本地 Ollama 在你的电脑上分析作文；在线 AI 会把题目和作文发送给所选服务商，使用你的账户额度。在线设置中输入的 API 密钥只保存在本机应用配置，不写入练习记录，可以随时删除。Codex 使用本机命令行已登录的账号额度；WorkBuddy 在页面上点一次「一键连接」，用浏览器登录后即可免密钥使用，模型可以自己选。在线列表里排在前面的是有免费额度的服务，但都需要在服务商网站注册并实名，免费规则以对方当前公告为准。示例为预设内容，服务失败时不会拿示例冒充分析结果。</p><p>小练习的答案对照与搭配检查为本地检查；「用上了搭配」不代表整句语法已通过 AI 审核。</p><a href="https://ielts.org/take-a-test/your-results/ielts-scoring-in-detail" target="_blank" rel="noopener noreferrer">查看 IELTS 官方评分说明 ↗</a></div>`);
+  openModal('写作工作台 · 使用与评分说明',`<div class="about-content"><h3>一次练习，走完一个学习闭环</h3><ol><li>选择题型并粘贴完整题目。Task 1 建议 20 分钟、150 词；Task 2 建议 40 分钟、250 词。学术类 Task 1 还需填写原图数据或流程/地图描述。</li><li>点击「开始分析」，先看三个重点，再点击原文和精修版的高亮。</li><li>中栏保留观点做必要修改；右栏只根据题目独立创作，可按需展开。</li><li>先看「本篇好词好句」：句式卡给骨架，表达卡给现成搭配，都带原句和出处。</li><li>点「照着写一句」进句式仿写：同一个句式换三个不同话题各写一句。判分只看三件事——句式是否用上、句子是否完整、是否换成了自己的内容，全部在本机完成，不消耗 AI 额度。错题可以只练那几条。</li></ol><h3>评分怎么看</h3><p>Task 1 使用任务完成度 TA，Task 2 使用任务回应 TR；其余三项为连贯与衔接 CC、词汇资源 LR、语法多样性与准确性 GRA。单篇四项等权，展示 AI 参考区间与文本证据。</p><p>这是练习估分，不能替代正式考试结果。语法修正不一定改善论证，范文也不会自动获得满分。这里评估单篇作文，不计算整场 Writing 总成绩。</p><h3>关于保存与 AI</h3><p>草稿、最近 30 篇练习和复习卡保存在当前浏览器。清除浏览器数据会移除这些记录，请通过「导出学习笔记」备份。</p><p>本地 Ollama 在你的电脑上分析作文；在线 AI 会把题目和作文发送给所选服务商，使用你的账户额度。在线设置中输入的 API 密钥只保存在本机应用配置，不写入练习记录，可以随时删除。Codex 使用本机命令行已登录的账号额度；WorkBuddy 用本机已登录账号的额度，模型可以自己选，但它还在测试中，只对部分账号开放，连不上就直接用在线 AI。在线列表里排在前面的是有免费额度的服务，但都需要在服务商网站注册并实名，免费规则以对方当前公告为准。示例为预设内容，服务失败时不会拿示例冒充分析结果。</p><p>小练习的答案对照与搭配检查为本地检查；「用上了搭配」不代表整句语法已通过 AI 审核。</p><a href="https://ielts.org/take-a-test/your-results/ielts-scoring-in-detail" target="_blank" rel="noopener noreferrer">查看 IELTS 官方评分说明 ↗</a></div>`);
 }
 
 document.addEventListener('click', async event=>{

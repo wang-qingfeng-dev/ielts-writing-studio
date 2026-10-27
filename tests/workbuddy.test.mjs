@@ -63,8 +63,8 @@ test('WorkBuddy output accepts the CLI envelope and a bare structured result', (
 test('WorkBuddy output turns an unauthenticated response into an actionable message', () => {
   assert.throws(
     () => parseWorkbuddyOutput('{"is_error":true,"result":"Authentication required. Please use /login command to sign in to your account"}'),
-    // 现在统一指向页面上的「一键连接」，不再让用户去找文件或敲命令。
-    error => error.status === 503 && /还没有登录/u.test(error.message) && /一键连接/u.test(error.message) && !/\/login/u.test(error.message)
+    // 现在统一指向页面上的「尝试连接」按钮，并说明这是测试中的功能。
+    error => error.status === 503 && /还没有登录/u.test(error.message) && /尝试连接/u.test(error.message) && /测试中/u.test(error.message) && !/\/login/u.test(error.message)
   );
   assert.throws(() => parseWorkbuddyOutput('not json at all'), /not valid JSON|was not JSON/);
 });
@@ -90,7 +90,7 @@ test('a WorkBuddy analysis explains the one-time login instead of failing silent
   process.env.FAKE_WORKBUDDY_MODE = 'auth';
   await assert.rejects(
     analyzeWriting({ prompt: DEMO_PROMPT, essay: DEMO_ESSAY, targetBand: 7 }),
-    error => error.status === 503 && /还没有登录/u.test(error.message) && /一键连接/u.test(error.message)
+    error => error.status === 503 && /还没有登录/u.test(error.message) && /尝试连接/u.test(error.message)
   );
 });
 

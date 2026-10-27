@@ -1227,6 +1227,9 @@ h1 { letter-spacing: -1.25px; }
 .wb-status strong { display: block; color: #43594a; font-size: 13px; font-weight: 600; line-height: 1.6; }
 .wb-status > div > span { display: block; margin-top: 2px; color: #8b978c; font-size: 12px; line-height: 1.75; }
 .wb-status-dot { flex-shrink: 0; width: 8px; height: 8px; margin-top: 7px; background: #c9d3c3; border-radius: 50%; }
+/* 测试功能标记：说明这是灰度中的能力，连不上属于正常。 */
+.wb-tag { display: inline-block; margin-left: 7px; padding: 1px 7px; background: #fdf3e0; border: 1px solid #efd9ae; border-radius: 999px; color: #9a7325; font-size: 10.5px; font-weight: 600; letter-spacing: .3px; vertical-align: 1px; }
+.wb-status.is-on .wb-tag { background: #eef6e8; border-color: #cfe3c4; color: #4f7a44; }
 .wb-status.is-on { background: #f1f8f0; border-color: #cfe3d2; }
 .wb-status.is-on strong { color: #2e6042; }
 .wb-status.is-on .wb-status-dot { background: #4f9a68; box-shadow: 0 0 0 4px #e1f0e2; }

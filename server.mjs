@@ -191,7 +191,7 @@ function workbuddyArgs({ schema, model, port, prompt }) {
 
 function workbuddyFailure(detail, file = '') {
   if (/authentication required|not logged in|please use\s*\/login|unauthorized|invalid api key/i.test(detail)) {
-    return new HttpError(503, 'WorkBuddy 还没有登录，或者登录已经过期。回到页面点一下「一键连接」，在浏览器里登录一次就好，不需要输入任何命令。');
+    return new HttpError(503, 'WorkBuddy 还没有登录，或者登录已经过期。回到页面点「尝试连接 WorkBuddy」登录一次（这项接入还在测试中，部分账号暂时用不了）。');
   }
   if (/ENOENT|spawn .* ENOENT|command not found/i.test(detail)) {
     return new HttpError(503, '找不到 WorkBuddy 命令行。请确认 WorkBuddy 已安装；如果装在非默认目录，请把环境变量 IELTS_WORKBUDDY_PATH 指向 resources/app.asar.unpacked/cli/bin/codebuddy 后重启软件。');
@@ -253,7 +253,7 @@ async function runWorkbuddy({ schema, prompt, workDir, signal, timeout = ANALYSI
     const failure = workbuddyFailure(output, file);
     if (failure) throw failure;
     if (execution.code !== 0) throw new HttpError(502, `WorkBuddy 分析失败（退出码 ${execution.code}）。请确认命令行可以正常启动后重试。`);
-    if (!execution.stdout.trim()) throw new HttpError(502, 'WorkBuddy 没有返回任何结果。回到页面点「一键连接」确认登录状态后再试。');
+    if (!execution.stdout.trim()) throw new HttpError(502, 'WorkBuddy 没有返回任何结果。它还在测试中，可以回到页面确认登录状态；如果仍不行，改用「设置在线 AI」里的免费模型。');
     return parseWorkbuddyOutput(execution.stdout);
   }
   throw lastError || new HttpError(502, 'WorkBuddy 分析失败，请重试。');
@@ -305,12 +305,12 @@ async function probeWorkbuddy() {
   const remember = value => { workbuddyStatusCache = { at: Date.now(), value }; return value; };
   const file = await findWorkbuddyCli();
   if (!file) {
-    return remember({ available:false, engine:'WorkBuddy CLI', needsInstall:true, message:'这台电脑上没有找到 WorkBuddy。装上 WorkBuddy 桌面版就能免密钥使用；也可以先用在线 AI。' });
+    return remember({ available:false, engine:'WorkBuddy CLI', needsInstall:true, message:'这台电脑上没有找到 WorkBuddy（这项接入还在测试中，只对部分账号开放）。也可以先用在线 AI。' });
   }
   if (await workbuddyConnected()) {
-    return remember({ available:true, engine, canLogin:true, message:`已连接 WorkBuddy（${workbuddyModelLabel(model)}）。用的是这台电脑上已登录账号的额度，不需要 API 密钥。` });
+    return remember({ available:true, engine, canLogin:true, message:`已连接 WorkBuddy（${workbuddyModelLabel(model)}）· 测试功能。用的是这台电脑上已登录账号的额度，不需要 API 密钥；测试阶段偶尔会连不上。` });
   }
-  return remember({ available:false, engine, needsLogin:true, canLogin:true, message:'WorkBuddy 还没连接。点一下「一键连接」，用这台电脑上已登录的账号自动连上。' });
+  return remember({ available:false, engine, needsLogin:true, canLogin:true, message:'WorkBuddy 还没连接。它还在测试中，只对部分账号开放，可以点「尝试连接 WorkBuddy」试一次；连不上就用免费在线 AI。' });
 }
 
 // wait=false 时先返回已有结果并在后台检查，避免页面顶部的状态栏被一次登录探测拖慢。
@@ -401,7 +401,7 @@ export async function analyzeWriting(input, { signal } = {}) {
             return normalize(await runWorkbuddy({ schema, prompt: prompt + validationNote, workDir, signal: controller.signal }));
           } catch (error) {
             if (error instanceof HttpError) throw error;
-            if (attempt === 1) throw new HttpError(502, `WorkBuddy 未能生成完整的正文和四项评分（已自动重试两次）。${engineNote()}请回到页面点「一键连接」确认 WorkBuddy 登录状态，或改用在「设置在线 AI」中配置的免费模型。你的原文已保留。`);
+            if (attempt === 1) throw new HttpError(502, `WorkBuddy 未能生成完整的正文和四项评分（已自动重试两次）。${engineNote()}WorkBuddy 接入还在测试中，请回到页面确认登录状态；这次不行就改用在「设置在线 AI」中配置的免费模型。你的原文已保留。`);
             validationNote = `\nValidation failed: ${error instanceof ValidationError ? error.message : 'Invalid or truncated JSON'}. Return a fresh complete JSON result. Each score must include ${task.criterion}, CC, LR, GRA exactly once; all bands and range bounds must be 0 to 9 in steps of 0.5. ${name === 'model' ? `Write a complete response of at least ${task.minimum} English words. Keep annotations concise.` : 'Keep only 3-6 well-supported issues and 2 expressions.'} Copy exact source quotes. Never return placeholders.\n`;
             continue;
           }

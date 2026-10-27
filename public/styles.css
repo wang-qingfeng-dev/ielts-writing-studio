@@ -1188,7 +1188,7 @@ h1 { letter-spacing: -1.25px; }
   .brand-name { font-size: 14px; }
   .header-actions { gap: 4px; }
   .header-actions .btn { min-height: 30px; padding: 6px 8px; }
-  .provider-select { max-width: 104px; min-height: 30px; }
+  .provider-select { max-width: 116px; min-height: 30px; }
   h1 { font-size: 25px; line-height: 1.34; }
   h1 > span { display: block; }
   .ai-line { display: grid; grid-template-columns: 26px minmax(0, 1fr); grid-template-areas: "icon copy" "btn btn"; align-items: start; gap: 8px 10px; }

@@ -2,7 +2,7 @@
 
 ## 0.4.3 — 修复覆盖升级后「一键连接」只报「接口不存在」
 
-- 已构建 Windows 便携包：`ielts-writing-studio-v0.4.3-windows-x64.zip`（BUILD_ARTIFACT_LINE_PLACEHOLDER）。`setup.exe` 仍依赖 Inno Setup 6，本机未安装。
+- 已构建 Windows 便携包：`ielts-writing-studio-v0.4.3-windows-x64.zip`（39.7 MB，源提交 `bcf78e7`，SHA256 `2424b5809e59d50996acf07e30b3096ca380a3ade669c382c5d7ee1a8b91ada7`）；解压实跑确认版本号 0.4.3、`/api/workbuddy` 返回 23 个模型、登录接口返回 `www.workbuddy.cn` 官方链接，启动脚本里的换版逻辑（`发现旧版本`）已在包内。`setup.exe` 仍依赖 Inno Setup 6，本机未安装。
 
 - **修复：覆盖升级后点「一键连接」只报「接口不存在」，等于所有用户都用不了。** 原因是旧版本的服务进程还在后台跑，`start.ps1` 看到端口上已有本应用的应答就直接复用，页面于是连着旧服务，`/api/workbuddy` 这类新接口全是 404。现在启动脚本会比对磁盘 `package.json` 与在跑实例的版本号，不一致就把旧实例停掉、换成新版本再打开页面；实测先用假实例模拟 v0.4.0 占着端口，双击启动后提示「发现旧版本 v0.4.0 还在运行，正在切换到 v0.4.3」，端口上确认换成新版本且接口可用。
 - 修复：同时设置了 `HTTP_PROXY` 和 `http_proxy` 的终端里，启动脚本会因 Windows PowerShell 重建环境变量字典时的大小写冲突直接报错、应用起不来；现在启动前先去掉小写副本。

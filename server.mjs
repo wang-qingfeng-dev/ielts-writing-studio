@@ -178,7 +178,11 @@ const workbuddyGateway = createWorkbuddyGateway({
 process.on('exit', () => workbuddyGateway.stop());
 
 function workbuddyArgs({ schema, model, port, prompt }) {
+  // 批改只要一段纯文本回答：关掉全部工具，并且不让用户机器上装的 MCP 服务参与。
+  // 不隔离 MCP 的话，每次批改都会先把 WorkBuddy 里配置的那一堆服务拉起来，
+  // 慢的时候能拖到十分钟还不出结果。
   const args = ['-p', '--output-format', 'json', '--tools', '', '--permission-mode', 'dontAsk',
+    '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
     '--no-session-persistence', '--port', String(port), '--json-schema', JSON.stringify(schema)];
   if (model) args.push('--model', model);
   if (prompt) args.push(prompt);

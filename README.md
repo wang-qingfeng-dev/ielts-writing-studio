@@ -1,6 +1,6 @@
 # 句进 · 雅思写作工作台
 
-> v0.4.0：新增「好词好句训练」——批改完成后，用这篇作文里的真实表达出 11 道填空、中译英和改错题，答完即时判分、错题可重练；新增 WorkBuddy CLI 接入（用本机已登录账号的额度，不必再买 API）；在线 AI 列表改为免费优先，新增智谱 GLM Flash 与混元 lite 等免费档。源码改动尚未重新打包，安装包仍为 [v0.3.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.3.0)。
+> v0.4.0：新增「好词好句训练」——批改完成后，用这篇作文里的真实表达出 11 道填空、中译英和改错题，答完即时判分、错题可重练；新增 WorkBuddy CLI 接入（用本机已登录账号的额度，不必再买 API）；在线 AI 列表改为免费优先，新增智谱 GLM Flash 与混元 lite 等免费档。Windows 便携包已按提交 `7fcd345` 构建（`release-artifacts/ielts-writing-studio-v0.4.0-windows-x64.zip`）；`setup.exe` 安装包还需要 Inno Setup 6，尚未构建，正式发布仍为 [v0.3.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.3.0)。
 
 [English](README.en.md) · [下载 v0.3.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.3.0) · [更新记录](CHANGELOG.md)
 

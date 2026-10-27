@@ -2,6 +2,8 @@
 
 ## 0.4.2 — WorkBuddy 改成一键连接，模型可以自己选
 
+- 已构建 Windows 便携包：`ielts-writing-studio-v0.4.2-windows-x64.zip`（39.7 MB，源提交 `9a8801f`，SHA256 `ab3763926058685f4f4838cdd5f906b1475997b54097c304ae156e5dc997b606`）；解压实跑确认 `/api/workbuddy` 返回 23 个模型、登录接口返回官方链接、旧登录脚本已不在包内。`setup.exe` 仍依赖 Inno Setup 6，本机未安装。
+
 - **连接不再需要用户找目录、双击文件、手打 `/login`。** 原来的 `Login WorkBuddy.cmd` 和 `login-workbuddy.ps1` 已删除：它们在当前版 WorkBuddy 上也跑不通（安装包里只有精简产物，没有独立终端界面）。现在改由应用自己在后台启动 WorkBuddy 的本地网关（`codebuddy --serve`），通过它的账号接口取回官方登录链接，页面直接打开浏览器登录，登录完成后自动检测并把面板切成「已连接」。
 - 新增 `workbuddy-gateway.mjs`：负责启动、解析端口与随机密码、带 `Authorization: Bearer` 调用网关接口、空闲十分钟自动退出、随应用退出一起收走。
 - 新增 `workbuddy-models.mjs`：23 个可用模型的清单（推荐 / 常用 / 更多三组，带中文名和一句说明），选择结果存在 `%LOCALAPPDATA%\JujinWritingStudio\settings\workbuddy.json`，分析时通过 `--model` 传入。

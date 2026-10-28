@@ -73,6 +73,12 @@ export function initCloudAiSetup(options = {}) {
     link.classList.toggle('hidden', !signupUrl);
     link.href = signupUrl || '#';
     link.textContent = signupUrl ? `登录 ${preset.label.split(' · ')[0]} · 获取密钥 ↗` : '请使用你信任的服务商控制台';
+    // 火山方舟这类“要先逐个开通模型”的服务，单独给一个控制台入口，免得用户拿着密钥一直撞 404。
+    const consoleLink = byId('cloud-provider-console');
+    let consoleUrl = null;
+    try { const url = new URL(preset?.consoleUrl); if (url.protocol === 'https:') consoleUrl = url.href; } catch { /* 该服务不需要单独开通模型。 */ }
+    consoleLink.classList.toggle('hidden', !consoleUrl);
+    if (consoleUrl) { consoleLink.href = consoleUrl; consoleLink.textContent = `去 ${preset.label.split(' · ')[0]} 控制台开通模型 ↗`; }
     keyInput.value = '';
     consentInput.checked = false;
     updateKeyHint();

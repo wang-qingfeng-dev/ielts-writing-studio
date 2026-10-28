@@ -28,12 +28,27 @@ function upstreamDetail(data) {
   return text.length > 160 ? `${text.slice(0, 160)}…` : text;
 }
 function hostOf(url) { try { return new URL(String(url)).hostname; } catch { return ''; } }
+// 火山方舟是按模型逐个开通的：地址对、模型 ID 对，账号没在控制台点过「开通」照样返回 404。
+// 原来这种 404 被统一翻成「地址或模型不存在，检查是否缺少 /v1」，对火山是完全指错方向的。
+function arkActivationMessage(data, detail) {
+  const code = String(data?.error?.code || '');
+  const text = `${code} ${detail}`;
+  if (!/ModelNotOpen|Ark Console/i.test(text)) return '';
+  const model = (/has not activated the model ([A-Za-z0-9._-]+)/i.exec(text)?.[1] || '').replace(/\.+$/u, '');
+  const name = model ? `「${model}」` : '这个模型';
+  return `火山方舟还没有给这个账号开通${name}。地址（/api/v3）和模型 ID 都是对的，这两项不用改，也不用加 /v1；`
+    + `请到方舟控制台的「开通管理」把${name}开通（首次使用通常还要完成实名认证），开通后回到本窗口再点一次「连接并使用」。`
+    + '控制台：https://console.volcengine.com/ark/region:cn-beijing/openManagement';
+}
 // 不同的 HTTP 状态码对应完全不同的处理动作；原来的统一文案让用户无从下手。
 function httpFailureMessage(status, data, { url = '' } = {}) {
   const detail = upstreamDetail(data);
   const seen = detail ? `（服务商返回：${detail}）` : '';
   const host = hostOf(url);
   const isDeepSeek = host.endsWith('deepseek.com');
+  const isArk = host.endsWith('volces.com') || /ModelNotOpen|Ark Console/i.test(`${data?.error?.code || ''} ${detail}`);
+  const arkMessage = arkActivationMessage(data, detail);
+  if (arkMessage) return arkMessage;
   switch (status) {
     case 400:
     case 422:
@@ -47,7 +62,9 @@ function httpFailureMessage(status, data, { url = '' } = {}) {
     case 403:
       return `密钥没有访问该模型的权限，或账户未完成实名/开通（HTTP 403）。请到服务商控制台确认模型权限与账户状态${seen}。`;
     case 404:
-      return `接口地址或模型不存在（HTTP 404）。请检查 API 地址是否缺少 /v1 结尾，以及模型名称是否拼写正确${seen}。`;
+      return isArk
+        ? `火山方舟找不到这个模型或没有开通权限（HTTP 404）。方舟的接口地址固定是 https://ark.cn-beijing.volces.com/api/v3，不要加 /v1；请核对模型 ID 是否已在控制台「开通管理」里开通${seen}。`
+        : `接口地址或模型不存在（HTTP 404）。请检查 API 地址是否缺少 /v1 结尾，以及模型名称是否拼写正确${seen}。`;
     case 429:
       return `服务商限流或免费额度已用尽（HTTP 429），请稍后重试或充值升级额度${seen}。`;
     default:

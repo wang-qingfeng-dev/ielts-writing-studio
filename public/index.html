@@ -133,11 +133,11 @@
           <label for="cloud-provider">1. 选择服务商</label><select id="cloud-provider" name="provider" required></select>
           <p id="cloud-provider-pricing" class="cloud-ai-hint"></p>
           <p id="cloud-provider-steps" class="cloud-ai-hint"></p>
-          <p><a class="btn btn-secondary" id="cloud-provider-signup" href="#" target="_blank" rel="noopener noreferrer">登录官方平台 · 获取密钥 ↗</a></p>
+          <p class="cloud-provider-links"><a class="btn btn-secondary" id="cloud-provider-signup" href="#" target="_blank" rel="noopener noreferrer">登录官方平台 · 获取密钥 ↗</a><a class="btn btn-ghost btn-small hidden" id="cloud-provider-console" href="#" target="_blank" rel="noopener noreferrer">去控制台开通模型 ↗</a></p>
           <p class="cloud-ai-hint">官方页面在新标签中打开，本窗口和作文会保留。聊天网站登录或会员不能直接授权本站，需使用服务商的 API 密钥；不要填写聊天账户密码。</p>
           <label for="cloud-api-key">2. 粘贴 API 密钥</label><input id="cloud-api-key" name="apiKey" type="password" autocomplete="off" spellcheck="false" autocapitalize="off" maxlength="4096" placeholder="粘贴服务商提供的 API Key" aria-describedby="cloud-key-help">
           <p id="cloud-key-help" class="cloud-ai-hint">密钥保存在这台电脑的应用配置中，不写入作文记录或 GitHub。不要在共享电脑上保存自己的密钥。</p>
-          <details id="cloud-advanced"><summary>模型与接口地址</summary><div class="cloud-advanced-fields"><label for="cloud-model">模型名称</label><input id="cloud-model" name="model" type="text" maxlength="200" autocomplete="off" required><label for="cloud-base-url">API 地址</label><input id="cloud-base-url" name="baseUrl" type="url" maxlength="500" autocomplete="off" required aria-describedby="cloud-base-help"><p id="cloud-base-help" class="cloud-ai-hint">预设服务无需修改。自定义服务请填写兼容接口的基础地址，通常以 /v1 结尾。</p></div></details>
+          <details id="cloud-advanced"><summary>模型与接口地址</summary><div class="cloud-advanced-fields"><label for="cloud-model">模型名称</label><input id="cloud-model" name="model" type="text" maxlength="200" autocomplete="off" required><label for="cloud-base-url">API 地址</label><input id="cloud-base-url" name="baseUrl" type="url" maxlength="500" autocomplete="off" required aria-describedby="cloud-base-help"><p id="cloud-base-help" class="cloud-ai-hint">预设服务无需修改（火山方舟固定是 /api/v3，不是 /v1；智谱是 /api/paas/v4）。自定义服务请填写兼容接口的基础地址，通常以 /v1 结尾。</p></div></details>
           <label class="cloud-consent" for="cloud-consent"><input id="cloud-consent" type="checkbox" required><span>我同意分析时将题目和作文发送给所选服务商，并使用我的账户额度；测试连接也会发送一条简短测试请求。</span></label>
           <details id="cloud-troubleshoot"><summary>连接失败怎么排查？</summary>
             <div class="cloud-advanced-fields">
@@ -145,6 +145,7 @@
               <p class="cloud-ai-hint">· <strong>HTTP 401</strong>：密钥不对或被删除了。重新复制整串密钥，注意不要带上空格或换行。</p>
               <p class="cloud-ai-hint">· <strong>HTTP 402</strong>：账户余额不足。DeepSeek 需要先在控制台“充值”；豆包需要先在火山方舟开通所选模型。</p>
               <p class="cloud-ai-hint">· <strong>HTTP 400 / 404</strong>：模型名称或地址不对。预设服务不要改地址；自定义服务通常以 <code>/v1</code> 结尾。</p>
+              <p class="cloud-ai-hint">· <strong>火山方舟提示「has not activated the model」</strong>：地址和模型 ID 都没问题，是这个账号还没在方舟控制台「开通管理」里开通该模型。开通（并完成实名）后再试，或换一个已开通的型号。</p>
               <p class="cloud-ai-hint">· <strong>连接超时或无法连接</strong>：这台电脑访问不了服务商，先确认浏览器能打开对方官网，或换网络后重试。</p>
               <p class="cloud-ai-hint">· <strong>“未通过 JSON 连接检查”</strong>：能用但不是对话模型（例如只做向量或语音），换一个对话模型。</p>
               <p class="cloud-ai-hint">本地 Ollama 报错时，页面会告诉你缺哪个模型、电脑上已装了哪些模型，以及要执行的 <code>ollama pull 模型名</code> 命令。</p>

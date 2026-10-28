@@ -140,6 +140,7 @@ body:has(.cloud-ai-dialog[open]) { overflow: hidden; }
 .cloud-ai-fields input:not([type="checkbox"]), .cloud-ai-fields select { min-width: 0; width: 100%; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); }
 .cloud-ai-fields input[readonly] { background: var(--paper); color: var(--muted); }
 .cloud-ai-fields a { font-size: 12px; }
+.cloud-provider-links { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .cloud-ai-hint { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .cloud-ai-fields details { padding: 12px 0; border-top: 1px solid var(--line); }
 .cloud-ai-fields summary { cursor: pointer; color: var(--green); font-size: 12px; }

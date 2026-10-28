@@ -64,6 +64,10 @@ test('豆包和腾讯预设固定官方地址，禁止继承其他服务密钥',
     assert.throws(()=>validateCloudSettings({provider,baseUrl:'https://other.example',apiKey:'synthetic-key'}),/预设服务商/);
     assert(!JSON.stringify(publicCloudSettings(c)).includes('synthetic-key'));
   }
+  // 火山方舟要逐个开通模型，所以预设里得带一个到「开通管理」的入口，别让人拿着密钥一直撞 404。
+  const doubao=CLOUD_PRESETS.find(item=>item.id==='doubao');
+  assert.match(doubao.consoleUrl, /^https:\/\/console\.volcengine\.com\/ark\//);
+  assert.ok(!doubao.baseUrl.endsWith('/v1'),'火山方舟的地址是 /api/v3');
 });
 
 test('公开设置完全隐藏密钥；连接成功标记只能由调用方的选项确认', async t => {

@@ -420,6 +420,26 @@ test('upstream HTTP failures keep the provider reason and the matching next step
   }
 });
 
+// 火山方舟是按模型逐个开通的：地址和模型 ID 都对，账号没开通也是 404。
+// 原来的统一文案让用户去查 /v1 和模型拼写，方向完全错了。
+test('an Ark "model not activated" 404 explains activation instead of blaming the URL', async t => {
+  const body = { error: { code: 'ModelNotOpen', message: 'Your account 2133038227 has not activated the model doubao-seed-2-1-pro-260628. Please activate the model service in the Ark Console. Request id: 02179316922705abc', param: '', type: 'Not Found' } };
+  const base = await serveJson(t, (_req, res) => { res.writeHead(404, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); });
+  await assert.rejects(
+    completeJson({ kind: 'compatible', url: base, model: 'doubao-seed-2-1-pro-260628', apiKey: 'test-key' }, { system: 'system', prompt: 'prompt', schema: { type: 'object' } }),
+    error => {
+      assert.equal(error.status, 404);
+      assert.match(error.message, /开通/u);
+      assert.match(error.message, /doubao-seed-2-1-pro-260628/u, '要把具体是哪个模型没开通说出来');
+      assert.ok(!/260628\./u.test(error.message), '模型 ID 后面不要粘上原文的句号');
+      assert.match(error.message, /api\/v3/u, '要告诉用户火山的地址本来就是 /api/v3');
+      assert.match(error.message, /openManagement/u, '要给出控制台开通页');
+      assert.ok(!/缺少 \/v1/u.test(error.message), '火山的 404 不能再说“地址缺少 /v1”');
+      return true;
+    }
+  );
+});
+
 test('a DeepSeek balance failure points at the recharge page instead of a generic message', async t => {
   const base = await serveJson(t, (_req, res) => { res.writeHead(402); res.end(JSON.stringify({ error: { message: 'Insufficient Balance' } })); });
   await assert.rejects(

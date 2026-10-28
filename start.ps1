@@ -54,7 +54,8 @@ try {
 }
 
 # 覆盖升级后旧实例往往还在后台跑（页面能开、但新接口全部 404）。
-# 这里比对磁盘上的版本号，不一致就把旧实例停掉，换成这次启动的版本。
+# 先比版本号，再比“代码指纹”：同版本但源码改过时也必须换进程，
+# 否则页面连着的是上个进程里加载的旧代码——改了没生效，用户看起来就跟没修一样。
 $studioDiskVersion = $null
 $studioManifestPath = Join-Path $studioRoot 'package.json'
 if (Test-Path -LiteralPath $studioManifestPath) {
@@ -62,18 +63,34 @@ if (Test-Path -LiteralPath $studioManifestPath) {
         $studioDiskVersion = (Get-Content -LiteralPath $studioManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json).version
     } catch { $studioDiskVersion = $null }
 }
-if ($studioReachable -and $studioDiskVersion -and $studioIdentity.version -and $studioIdentity.version -ne $studioDiskVersion) {
-    $studioStalePid = 0
-    [void][int]::TryParse([string]$studioIdentity.pid, [ref]$studioStalePid)
-    if ($studioStalePid -gt 0) {
-        Write-Host "发现旧版本 v$($studioIdentity.version) 还在运行，正在切换到 v$studioDiskVersion…"
-        Stop-Process -Id $studioStalePid -ErrorAction SilentlyContinue
-        for ($studioTry = 0; $studioTry -lt 40; $studioTry++) {
-            Start-Sleep -Milliseconds 150
-            try { Invoke-RestMethod -Uri "$studioUrl/api/app-info" -TimeoutSec 1 | Out-Null } catch { break }
-        }
+$studioDiskBuild = $null
+$studioBuildScript = Join-Path $studioRoot 'build-id.mjs'
+if (Test-Path -LiteralPath $studioBuildScript) {
+    try {
+        $studioBuildLines = & $studioNodePath $studioBuildScript
+        if ($LASTEXITCODE -eq 0 -and $studioBuildLines) { $studioDiskBuild = ([string]($studioBuildLines | Select-Object -First 1)).Trim() }
+    } catch { $studioDiskBuild = $null }
+}
+if ($studioReachable) {
+    $studioStaleReason = $null
+    if ($studioDiskVersion -and $studioIdentity.version -and $studioIdentity.version -ne $studioDiskVersion) {
+        $studioStaleReason = "版本 v$($studioIdentity.version) 换成 v$studioDiskVersion"
+    } elseif ($studioDiskBuild -and ([string]$studioIdentity.build) -ne $studioDiskBuild) {
+        $studioStaleReason = "程序文件已更新，指纹 $([string]$studioIdentity.build) 换成 $studioDiskBuild"
     }
-    $studioReachable = $false
+    if ($studioStaleReason) {
+        $studioStalePid = 0
+        [void][int]::TryParse([string]$studioIdentity.pid, [ref]$studioStalePid)
+        if ($studioStalePid -gt 0) {
+            Write-Host "发现还在跑的旧实例（$studioStaleReason），正在重启…"
+            Stop-Process -Id $studioStalePid -ErrorAction SilentlyContinue
+            for ($studioTry = 0; $studioTry -lt 40; $studioTry++) {
+                Start-Sleep -Milliseconds 150
+                try { Invoke-RestMethod -Uri "$studioUrl/api/app-info" -TimeoutSec 1 | Out-Null } catch { break }
+            }
+        }
+        $studioReachable = $false
+    }
 }
 
 if (-not $studioReachable) {

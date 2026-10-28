@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { completeJson, getProviderStatus, getProviderOverride, setProviderOverride, setCloudConfig, resolveProvider, ProviderError } from '../provider.mjs';
+import { availableArkModels, completeJson, getProviderStatus, getProviderOverride, setProviderOverride, setCloudConfig, resolveProvider, ProviderError } from '../provider.mjs';
 import { analyzeWriting } from '../server.mjs';
 import { DEMO_PROMPT, DEMO_ESSAY, DEMO_ANALYSIS } from '../public/demo.js';
 
@@ -438,6 +438,35 @@ test('an Ark "model not activated" 404 explains activation instead of blaming th
       return true;
     }
   );
+});
+
+// 火山方舟不让用户自己猜哪个模型能用：拿密钥问账号，直接告诉他现在能用的是哪一个。
+test('Ark model detection reports the model this account can actually call', async t => {
+  const probed = [];
+  const base = await serveJson(t, (req, res, body) => {
+    if (req.url === '/models') {
+      res.end(JSON.stringify({ data: [
+        { id: 'doubao-seed-2-1-pro-260915', created: 1789472816, status: 'Open' },
+        { id: 'doubao-seed-2-1-lite-260915', created: 1788247689, status: 'Open' },
+        { id: 'doubao-seed-2-0-mini-260428', created: 1778037357, status: 'Shutdown' },
+        { id: 'doubao-seedream-5-0-pro-260628', created: 1782821774, status: 'Open' },
+      ] }));
+      return;
+    }
+    probed.push(body?.model);
+    if (body?.model === 'doubao-seed-2-1-pro-260915') {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: { code: 'ModelNotOpen', message: 'Your account 1 has not activated the model doubao-seed-2-1-pro-260915.' } }));
+      return;
+    }
+    res.end(JSON.stringify({ choices: [{ message: { content: '{"ok":true}' } }] }));
+  });
+  const previous = process.env.ARK_BASE_URL;
+  process.env.ARK_BASE_URL = base;
+  t.after(() => { if (previous === undefined) delete process.env.ARK_BASE_URL; else process.env.ARK_BASE_URL = previous; });
+  assert.deepEqual(await availableArkModels('test-key'), ['doubao-seed-2-1-lite-260915']);
+  assert.ok(!probed.includes('doubao-seed-2-0-mini-260428'), '已下线的模型不该拿去试');
+  assert.ok(!probed.includes('doubao-seedream-5-0-pro-260628'), '文生图模型不能当对话模型用');
 });
 
 test('a DeepSeek balance failure points at the recharge page instead of a generic message', async t => {

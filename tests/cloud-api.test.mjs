@@ -249,3 +249,46 @@ test('真实连接检测只发送固定小型 JSON 测试，不发送用户作�
   assert.equal(JSON.stringify(sent.body).includes('synthetic-probe-key'), false);
   assert.equal(sent.body.max_tokens, 1024);
 });
+
+// 火山方舟“模型未开通”不能只报错：接口要给页面一个可编程代码，页面才能弹出“去开通 → 自动连上”。
+test('the Ark probe reports a missing activation as a code the page can act on', async t => {
+  const { base } = await fixture(t, {
+    probeCloud: async () => { throw new ProviderError(404, '火山方舟还没有给这个账号开通「doubao-seed-2-1-pro-260628」。', 'ark-model-not-open'); },
+  });
+  const response = await request(base, undefined, { provider: 'doubao', apiKey: 'synthetic-key' });
+  assert.equal(response.status, 404);
+  const body = await response.json();
+  assert.equal(body.code, 'ark-model-not-open');
+  assert.match(body.error, /开通/u);
+});
+
+test('the Ark model list endpoint answers with the models this account can call', async t => {
+  const stub = http.createServer(async (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    if (req.url === '/models') { res.end(JSON.stringify({ data: [{ id: 'doubao-seed-2-1-lite-260915', created: 1788247689, status: 'Open' }] })); return; }
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    if (req.headers.authorization !== 'Bearer synthetic-key') { res.writeHead(401); res.end('{"error":{"message":"unauthorized"}}'); return; }
+    res.end(JSON.stringify({ choices: [{ message: { content: '{"ok":true}' } }] }));
+  });
+  await new Promise(resolve => stub.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise(resolve => { stub.closeAllConnections(); stub.close(resolve); }));
+  const previous = process.env.ARK_BASE_URL;
+  process.env.ARK_BASE_URL = `http://127.0.0.1:${stub.address().port}`;
+  t.after(() => { if (previous === undefined) delete process.env.ARK_BASE_URL; else process.env.ARK_BASE_URL = previous; });
+  const { base } = await fixture(t);
+  const response = await request(base, '/api/cloud-settings/ark-models', { apiKey: 'synthetic-key' });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.deepEqual(body.models, ['doubao-seed-2-1-lite-260915']);
+  const missing = await request(base, '/api/cloud-settings/ark-models', {});
+  assert.equal(missing.status, 400, '没有密钥时要直接说清楚，而不是报一个看不懂的错');
+});
+
+test('the running server advertises the same code fingerprint the launcher compares', async t => {
+  const { buildId } = await import('../build-id.mjs');
+  const { base } = await fixture(t);
+  const info = await (await fetch(`${base}/api/app-info`)).json();
+  assert.equal(info.build, buildId());
+  assert.equal(info.version, '0.4.3');
+});

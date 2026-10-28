@@ -14,6 +14,7 @@ export function initCloudAiSetup(options = {}) {
   const modelInput = byId('cloud-model');
   const consentInput = byId('cloud-consent');
   const feedback = byId('cloud-ai-feedback');
+  const recovery = byId('cloud-ai-recovery');
   const saveButton = byId('cloud-ai-save');
   const clearButton = byId('cloud-ai-clear');
   let config = null;
@@ -28,6 +29,79 @@ export function initCloudAiSetup(options = {}) {
     feedback.classList.toggle('hidden', !message);
     feedback.classList.toggle('is-error', isError);
     feedback.setAttribute('role', isError ? 'alert' : 'status');
+  }
+  function clearRecovery() {
+    if (!recovery) return;
+    recovery.classList.add('hidden');
+    recovery.replaceChildren();
+  }
+  // 火山方舟按模型逐个开通，用户不该跑去控制台抄模型 ID。
+  // 这里给两个按钮：去开通、开好了自动挑一个能用的模型并连上。
+  function showArkRecovery() {
+    if (!recovery) return;
+    const consoleUrl = config?.providers?.find(item => item.id === 'doubao')?.consoleUrl
+      || 'https://console.volcengine.com/ark/region:cn-beijing/openManagement';
+    recovery.innerHTML = `<p class="cloud-ai-recovery-lead">这个账号还没有开通豆包模型。开通只要点一下，回来再点一次，我就自动挑一个能用的模型连上——不用自己填模型名称。</p>
+      <div class="cloud-ai-recovery-actions">
+        <a class="btn btn-secondary btn-small" href="${consoleUrl}" target="_blank" rel="noopener noreferrer">① 去火山方舟开通模型 ↗</a>
+        <button class="btn btn-primary btn-small" type="button" data-recovery="ark-auto">② 我开好了，自动连接</button>
+        <button class="btn btn-ghost btn-small" type="button" data-recovery="use-glm">先用免费的智谱模型</button>
+      </div>
+      <p class="cloud-ai-hint">开通后一般要等 1 到 2 分钟生效；没有完成实名认证的话，开通也不会生效。</p>`;
+    recovery.classList.remove('hidden');
+  }
+  // 问一次账号：官方目录里最新的几个豆包模型，哪个是真能用的。
+  async function autoConnectArk() {
+    if (busy || loading || options.isBusy?.()) return;
+    clearRecovery();
+    setBusy(true);
+    setFeedback('正在问火山方舟：这个账号已开通哪些豆包模型…');
+    let models = [];
+    try {
+      const typedKey = keyInput.value.trim();
+      const response = await fetch('/api/cloud-settings/ark-models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(typedKey ? { apiKey: typedKey } : {}),
+        signal: AbortSignal.timeout(70000),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || '自动检测失败，请稍后重试。');
+      models = Array.isArray(result.models) ? result.models : [];
+    } catch (error) {
+      setBusy(false);
+      setFeedback(error.message || '自动检测失败，请稍后重试。', true);
+      showArkRecovery();
+      return;
+    }
+    if (!models.length) {
+      setBusy(false);
+      setFeedback('还没有检测到已开通的豆包模型。开通后一般要等 1–2 分钟生效，稍等再点一次；不想等就先用免费的智谱模型。', true);
+      showArkRecovery();
+      return;
+    }
+    modelInput.value = models[0];
+    byId('cloud-advanced').open = true;
+    setFeedback(`找到可用的模型：${models.join('、')}。正在用它连接…`);
+    setBusy(false);
+    // 交给原来的提交流程：保存设置、切换在线 AI、关闭窗口，全都复用。
+    form.requestSubmit();
+  }
+  function switchToFreeGlm() {
+    clearRecovery();
+    providerInput.value = 'glm';
+    showProvider();
+    byId('cloud-advanced').open = false;
+    setFeedback('已切到智谱 GLM 的免费型号 glm-4.7-flash：去开放平台创建密钥，粘贴到下面就能连。');
+  }
+  if (recovery) {
+    recovery.addEventListener('click', event => {
+      const action = event.target.closest('[data-recovery]')?.dataset.recovery;
+      if (!action) return;
+      event.preventDefault();
+      if (action === 'ark-auto') void autoConnectArk();
+      else if (action === 'use-glm') switchToFreeGlm();
+    });
   }
   function updateControls() {
     const appBusy = Boolean(options.isBusy?.());
@@ -123,7 +197,12 @@ export function initCloudAiSetup(options = {}) {
     });
     let result;
     try { result = await response.json(); } catch { throw new Error('无法读取服务响应，请确认应用已更新并重启。'); }
-    if (!response.ok) throw new Error(result.error || result.message || `连接失败（${response.status}）。`);
+    if (!response.ok) {
+      const error = new Error(result.error || result.message || `连接失败（${response.status}）。`);
+      error.code = result.code || '';
+      error.status = response.status;
+      throw error;
+    }
     return result;
   }
   async function refresh() {
@@ -154,13 +233,14 @@ export function initCloudAiSetup(options = {}) {
   byId('cloud-ai-cancel').addEventListener('click', close);
   dialog.addEventListener('close', () => {
     sessionId += 1;
+    clearRecovery();
     keyInput.value = '';
     consentInput.checked = false;
     requestController?.abort();
     if (lastFocused?.isConnected) lastFocused.focus();
   });
   dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
-  providerInput.addEventListener('change', () => { showProvider(); setFeedback(); });
+  providerInput.addEventListener('change', () => { showProvider(); clearRecovery(); setFeedback(); });
   baseInput.addEventListener('input', updateKeyHint);
   form.addEventListener('invalid', event => {
     if (keyInput.validity.valueMissing || event.target === keyInput) setFeedback('请先从服务商网站获取 API 密钥，再粘贴到这里。', true);
@@ -177,6 +257,7 @@ export function initCloudAiSetup(options = {}) {
     if (keyInput.value.trim()) data.apiKey = keyInput.value.trim();
     requestController = new AbortController();
     const timeout = setTimeout(() => requestController?.abort('timeout'), 90000);
+    clearRecovery();
     setBusy(true); setFeedback('正在发送简短测试请求，不会发送你的作文。验证成功后保存并切换在线 AI…');
     try {
       const result = await request('POST', data, requestController.signal);
@@ -185,7 +266,10 @@ export function initCloudAiSetup(options = {}) {
       await options.onConnected?.(result);
       close();
     } catch (error) {
-      if (dialog.open) setFeedback(requestController?.signal.aborted ? '连接测试等待超时，请检查网络、服务商账户额度和模型名称后重试。' : error.message, true);
+      if (dialog.open) {
+        setFeedback(requestController?.signal.aborted ? '连接测试等待超时，请检查网络、服务商账户额度和模型名称后重试。' : error.message, true);
+        if (error.code === 'ark-model-not-open') showArkRecovery(); else clearRecovery();
+      }
       // 用户关闭或网络超时时，服务端可能已经保存，重新读取最终状态。
       if (requestController?.signal.aborted) {
         try { await refresh(); await options.onRefresh?.(); } catch { /* 下次打开设置时可以重新读取。 */ }

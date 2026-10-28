@@ -13,7 +13,8 @@ let runtimeWorkbuddyModel = '';
 export function setCloudConfig(config) { runtimeCloudConfig = config ? { ...config } : null; }
 
 export class ProviderError extends Error {
-  constructor(status, message) { super(message); this.status = status; }
+  // code 用来给页面做分支（例如火山“模型未开通”要显示一键开通/自动检测），不是给用户看的。
+  constructor(status, message, code = '') { super(message); this.status = status; this.code = code; }
 }
 
 // 服务商返回的错误正文只用于告诉用户真正的原因（余额、模型名、权限），
@@ -123,7 +124,8 @@ async function fetchJson(url, options = {}, signal) {
     const response = await requestJson(url, { ...options, signal, timeoutMs });
     const data = response.data;
     if (response.status < 200 || response.status >= 300) {
-      throw new ProviderError(response.status, httpFailureMessage(response.status, response.data, { url }));
+      const failureCode = arkActivationMessage(response.data, upstreamDetail(response.data)) ? 'ark-model-not-open' : '';
+      throw new ProviderError(response.status, httpFailureMessage(response.status, response.data, { url }), failureCode);
     }
     if (data === null) throw new ProviderError(502, 'AI 接口返回的内容不是有效 JSON。');
     return data;
@@ -300,4 +302,38 @@ export async function completeVisionJson(provider, { system, prompt, imageData, 
     return parseJson(extractText(data));
   }
   throw new ProviderError(503, '当前 AI 模式不支持图片识别，请切换到支持视觉输入的在线模型或本地视觉模型。');
+}
+
+// 火山方舟按模型逐个开通，用户根本不知道自己的账号能用哪个。
+// 这里直接拿密钥问账号：从官方模型目录里挑最新几个对话模型真发一次请求，把能用的挑出来，
+// 页面就能一键换成可用模型，不用回控制台抄 ID、也不用反复改设置。
+// 保留环境变量入口，自检脚本和测试可以指向本地假服务，不用真的打到线上。
+function arkBase() { return process.env.ARK_BASE_URL || 'https://ark.cn-beijing.volces.com/api/v3'; }
+export async function availableArkModels(apiKey, { signal } = {}) {
+  const base = arkBase();
+  const catalog = await fetchJson(`${base}/models`, { headers: { Authorization: `Bearer ${apiKey}` } }, signal);
+  const candidates = (Array.isArray(catalog?.data) ? catalog.data : [])
+    .filter(item => /^doubao-seed-\d/u.test(String(item?.id)) && !['Shutdown', 'Retiring'].includes(String(item?.status)))
+    .sort((a, b) => (b.created || 0) - (a.created || 0))
+    .map(item => item.id)
+    .slice(0, 6);
+  const usable = new Set();
+  let authError = null;
+  await Promise.all(candidates.map(async model => {
+    try {
+      await completeJson({ kind: 'compatible', url: base, model, apiKey }, {
+        system: 'This is a connection probe. Return JSON only. Do not explain.',
+        prompt: 'Return exactly {"ok":true}.',
+        schema: { type: 'object', properties: { ok: { type: 'boolean' } }, required: ['ok'], additionalProperties: false },
+        maxTokens: 16,
+        signal,
+      });
+      usable.add(model);
+    } catch (error) {
+      // 密钥无效、欠费是账号级问题，换个模型也一样，直接把原错误抛回去。
+      if (error?.status === 401 || error?.status === 402) authError = authError || error;
+    }
+  }));
+  if (!usable.size && authError) throw authError;
+  return candidates.filter(model => usable.has(model));
 }

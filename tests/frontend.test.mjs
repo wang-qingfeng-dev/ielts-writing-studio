@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { annotate, issueAnnotation, countWords, normalizeAnswer, nextReview, makeCardId } from '../public/utils.js';
@@ -83,4 +84,16 @@ test('demo data passes the same evidence and scoring checks as a live result', (
   assert.equal(DEMO_ANALYSIS.priorities.length,3);
   assert.ok(countWords(DEMO_ANALYSIS.model.text)>=250);
   assert.ok(DEMO_ANALYSIS.issues.filter(issue=>issue.category==='spelling').every(issue=>issue.priority==='essential'));
+});
+
+// 火山方舟“没开通模型”不该只丢一段报错，页面必须有可点的下一步：
+// 去控制台开通 → 回来自动挑一个能用的模型连上，用户不用自己填模型 ID。
+test('the online-AI panel offers a one-click recovery for an unactivated Ark model', async () => {
+  const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
+  const js = await readFile(new URL('../public/cloud-ai-setup.js', import.meta.url), 'utf8');
+  assert.match(html, /id="cloud-ai-recovery"/);
+  assert.match(js, /ark-model-not-open/);
+  assert.match(js, /data-recovery="ark-auto"/);
+  assert.match(js, /\/api\/cloud-settings\/ark-models/);
+  assert.match(js, /requestSubmit\(\)/, '自动挑到模型后要复用原来的连接流程');
 });

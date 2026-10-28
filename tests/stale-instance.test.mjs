@@ -11,12 +11,31 @@ test('the launcher replaces a running instance whose version differs from the on
   const script = await read('start.ps1');
   assert.match(script, /api\/app-info/);
   assert.match(script, /package\.json/);
-  assert.match(script, /发现旧版本/, '启动脚本要告诉用户正在换版本');
+  assert.match(script, /发现还在跑的旧实例/, '启动脚本要告诉用户正在换实例');
   assert.match(script, /Stop-Process -Id \$studioStalePid/);
   const checkAt = script.indexOf('$studioIdentity.version -ne $studioDiskVersion');
   const startAt = script.indexOf('Start-Process -FilePath $studioNodePath');
   assert.ok(checkAt > 0, '要先比较版本号');
   assert.ok(startAt > checkAt, '换版本的判断必须排在启动新实例之前');
+});
+
+// 版本号不变但代码改了（修 bug 的常态）时，旧进程会一直活着，
+// 页面连的还是内存里的旧代码——用户看到的就是“修了跟没修一样”。
+test('the launcher also replaces an instance whose code fingerprint differs', async () => {
+  const script = await read('start.ps1');
+  assert.match(script, /build-id\.mjs/, '启动脚本要读代码指纹');
+  assert.match(script, /\$studioIdentity\.build/, '要和运行中实例的指纹比');
+  assert.match(script, /程序文件已更新/);
+  const checkAt = script.indexOf('$studioIdentity.build');
+  const startAt = script.indexOf('Start-Process -FilePath $studioNodePath');
+  assert.ok(checkAt > 0 && startAt > checkAt, '指纹判断必须在启动新实例之前');
+});
+
+test('the build fingerprint is short, stable and exposed by the running server', async () => {
+  const { buildId } = await import('../build-id.mjs');
+  const first = buildId();
+  assert.match(first, /^[0-9a-f]{12}$/u);
+  assert.equal(buildId(), first, '同一份代码要给出同一个指纹');
 });
 
 test('the launcher survives environments that set both HTTP_PROXY and http_proxy', async () => {

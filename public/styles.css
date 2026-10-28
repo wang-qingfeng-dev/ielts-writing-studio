@@ -149,6 +149,11 @@ body:has(.cloud-ai-dialog[open]) { overflow: hidden; }
 .cloud-consent input { flex-shrink: 0; margin-top: 4px; accent-color: var(--green); }
 .cloud-ai-feedback { padding: 12px; margin-top: 14px; border-radius: 8px; background: var(--green-soft); color: var(--green); }
 .cloud-ai-feedback.is-error { background: var(--red-soft); color: var(--red); }
+/* 火山方舟“模型未开通”时的一键恢复区：去开通 → 回来自动挑模型连上。 */
+.cloud-ai-recovery { display: grid; gap: 10px; margin-top: 12px; padding: 13px 15px; background: #fdf8ec; border: 1px solid #e9d9b4; border-radius: 10px; }
+.cloud-ai-recovery-lead { margin: 0; color: #7c6335; font-size: 12.5px; line-height: 1.8; }
+.cloud-ai-recovery-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cloud-ai-recovery-actions a { color: inherit; text-decoration: none; }
 .cloud-ai-footer { flex-wrap: wrap; gap: 10px; }
 .cloud-ai-footer .cloud-clear { margin-right: auto; color: var(--red); }
 @media (max-width: 640px) {

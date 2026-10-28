@@ -6,7 +6,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { correctionSchema, modelSchema, validateCorrection, validateModel, validateAnalysis, validateRequest, ValidationError } from './analysis-schema.mjs';
-import { resolveProvider, getProviderStatus, setProviderOverride, getProviderOverride, completeJson, completeVisionJson, assertOllamaModel, ProviderError, setCloudConfig, workbuddyModel, workbuddyModelLabel, setWorkbuddyModel } from './provider.mjs';
+import { resolveProvider, getProviderStatus, setProviderOverride, getProviderOverride, completeJson, completeVisionJson, assertOllamaModel, ProviderError, setCloudConfig, workbuddyModel, workbuddyModelLabel, setWorkbuddyModel, availableArkModels } from './provider.mjs';
 import { createLocalAIManager } from './local-ai.mjs';
 import { normalizeCorrection, normalizeModel } from './analysis-normalization.mjs';
 import { generateLocalModel } from './local-model.mjs';
@@ -17,6 +17,7 @@ import { createCloudSettingsStore, validateCloudSettings, publicCloudSettings, C
 import { createUpdater, UpdateError } from './updater.mjs';
 import { createWorkbuddyGateway } from './workbuddy-gateway.mjs';
 import { createWorkbuddyModelStore, workbuddyModelPayload, normalizeWorkbuddyModel } from './workbuddy-models.mjs';
+import { buildId } from './build-id.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -565,13 +566,24 @@ export function createServer({ analyze = analyzeWriting, status = getEngineStatu
           return sendJson(res, 200, { ...publicCloudSettings(cloudConfig), providerStatus:await status() });
         } finally { switching = false; res.off('close', abortProbe); }
       }
+      // 火山方舟按模型逐个开通：拿密钥问一次账号，直接告诉页面“现在就能用”的是哪几个，
+      // 用户点一次就能换过去，不用回控制台抄模型 ID、也不用反复改设置。
+      if (url.pathname === '/api/cloud-settings/ark-models' && req.method === 'POST') {
+        if (!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] || '')) throw new HttpError(415, '请使用 JSON 格式提交。');
+        const body = await readBody(req);
+        if (!body || typeof body !== 'object' || Array.isArray(body)) throw new HttpError(400, '请求格式无效。');
+        const typed = typeof body.apiKey === 'string' ? body.apiKey.trim() : '';
+        const key = typed || (cloudConfig?.provider === 'doubao' ? String(cloudConfig.apiKey || '') : '');
+        if (!key) throw new HttpError(400, '请先粘贴火山方舟的 API 密钥，再自动检测已开通的模型。');
+        return sendJson(res, 200, { provider: 'doubao', models: await availableArkModels(key, { signal: AbortSignal.timeout(45000) }) });
+      }
       if (url.pathname === '/api/status' && req.method === 'GET') return sendJson(res, 200, await status({ wait:false }));
       // refresh=1 供“我已登录，重新检查”使用：丢掉 5 分钟缓存，等这一次真实探测结果。
       if (url.pathname === '/api/provider' && req.method === 'GET') {
         const refresh = url.searchParams.get('refresh') === '1';
         return sendJson(res, 200, await status(refresh ? { wait:true, refresh:true } : { wait:false }));
       }
-      if (url.pathname === '/api/app-info' && req.method === 'GET') return sendJson(res, 200, { app: 'ielts-writing-studio', version: APP_VERSION, pid: process.pid });
+      if (url.pathname === '/api/app-info' && req.method === 'GET') return sendJson(res, 200, { app: 'ielts-writing-studio', version: APP_VERSION, build: buildId(), pid: process.pid });
       if (url.pathname === '/api/task1/image-to-text' && req.method === 'POST') {
         if (!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] || '')) throw new HttpError(415, '请使用 JSON 格式提交。');
         if (busy || switching) throw new HttpError(409, '请完成当前分析或 AI 切换后再识别图片。');
@@ -691,7 +703,10 @@ export function createServer({ analyze = analyzeWriting, status = getEngineStatu
       res.writeHead(200, { 'Content-Type': MIME[path.extname(resolved)] || 'application/octet-stream', 'Cache-Control': 'no-cache', 'Content-Length': content.length });
       res.end(req.method === 'HEAD' ? undefined : content);
     } catch (error) {
-      if (!res.destroyed && !res.headersSent) sendJson(res, error instanceof ValidationError ? 400 : error.status || 500, { error: error instanceof ValidationError || error instanceof HttpError || error instanceof ProviderError || error instanceof CloudSettingsError || error instanceof UpdateError ? error.message : '服务出现异常，请刷新后重试。' });
+      if (!res.destroyed && !res.headersSent) sendJson(res, error instanceof ValidationError ? 400 : error.status || 500, {
+        error: error instanceof ValidationError || error instanceof HttpError || error instanceof ProviderError || error instanceof CloudSettingsError || error instanceof UpdateError ? error.message : '服务出现异常，请刷新后重试。',
+        ...(error?.code === 'ark-model-not-open' ? { code: 'ark-model-not-open' } : {}),
+      });
     }
   });
   server.on('close', () => { void localAI.close(); });

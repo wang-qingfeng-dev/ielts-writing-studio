@@ -39,7 +39,7 @@
 
 ```text
 ielts-writing-studio-v0.4.3-windows-x64.zip
-SHA256 5582f28e10f83ab436f6f383d82cffb643f304533db8f08d38b3062636489287
-39,762,022 bytes
-source commit 0edeff9
+SHA256 fa112bf9d9660d391c00f7927f7c98fb76b003797bf2931b80eb2db9e642a1d2
+39,769,643 bytes
+source commit 59e5a03
 ```

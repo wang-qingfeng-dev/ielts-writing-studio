@@ -1,10 +1,10 @@
 # 句进 · 雅思写作工作台
 
-> v0.2.0：新增 Task 1 小作文、国产在线 AI 引导、Windows 在线更新，以及 Apple Silicon / Intel 两种 Mac 包。请阅读[使用说明](docs/task1-online-preview.md)和[更新说明](docs/release-notes-v0.2.0.md)。
+> v0.4.3：修掉「升级后点一键连接只报接口不存在」——启动脚本会认出还在后台跑的旧版本并自动换成新的；WorkBuddy 一键连接本身保持不变。最新发布：[v0.4.3](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.4.3)（Windows 免安装版）。
 
-[English](README.en.md) · [下载 v0.2.0](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.2.0) · [更新记录](CHANGELOG.md)
+[English](README.en.md) · [下载 v0.4.3](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.4.3) · [更新记录](CHANGELOG.md)
 
-**v0.2.0** 支持 Task 1 学术类与培训类、Task 2，以及 DeepSeek、豆包（火山方舟）等在线接口。首次配置自己的 API 密钥，以后直接在应用内批改；不提供共享额度。
+**v0.4.3** 支持 Task 1 学术类与培训类、Task 2，以及 DeepSeek、豆包（火山方舟）等在线接口。首次配置自己的 API 密钥，以后直接在应用内批改；不提供共享额度。
 
 一个面向中文学习者的 IELTS Writing Task 1 / Task 2 本机学习工具。通过「我的原文 → 保留原意的精修 → 独立范文」三栏对照，把批改转化成可以复习、造句和迁移的学习卡片。
 
@@ -28,7 +28,7 @@
 
 ### Windows：下载便携版
 
-1. 下载 [句进 v0.2.0 Windows x64 便携版 ZIP](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.2.0/ielts-writing-studio-v0.2.0-windows-x64.zip)。
+1. 下载 [句进 v0.4.3 Windows x64 免安装版 ZIP](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.4.3/ielts-writing-studio-v0.4.3-windows-x64.zip)。
 2. **先完整解压**到一个文件夹，不要在压缩包里直接运行。
 3. 双击解压目录中的 `Start Portable.cmd`，打开本机网页。
 
@@ -36,9 +36,9 @@
 
 ### Windows：小白一键安装（推荐）
 
-下载 [句进 v0.2.0 一键安装程序](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.2.0/ielts-writing-studio-v0.2.0-windows-x64-setup.exe)，双击后按中文向导完成安装。安装程序自带 Node.js，不需要打开命令行。
+下载 [句进 v0.3.0 一键安装程序](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.3.0/ielts-writing-studio-v0.3.0-windows-x64-setup.exe)，双击后按中文向导完成安装。安装程序自带 Node.js，不需要打开命令行；v0.4.x 目前提供免安装版。
 
-**升级：** v0.1.2 及更早版本没有更新入口，请先关闭旧版并运行这次安装程序，安装到原目录。从 v0.2.0 起，Windows x64 安装版可在页面底部点“检查更新”→“下载、安装并重启”。只在用户点击后联网和下载，校验 SHA-256 后安装；保留同一浏览器、地址和端口的学习记录，以及外部 AI 配置与模型。便携版、源码和 Mac 请下载新包。重要笔记建议先导出。
+**升级：** v0.1.2 及更早版本没有更新入口，请先关闭旧版并运行安装程序，安装到原目录。Windows x64 安装版可在页面底部点“检查更新”→“下载、安装并重启”。只在用户点击后联网和下载，校验 SHA-256 后安装；保留同一浏览器、地址和端口的学习记录，以及外部 AI 配置与模型。便携版、源码和 Mac 请下载新包。重要笔记建议先导出。
 
 首次启动先提供在线与本地两种选择，不会自动下载模型。只有点击「一键准备本地 AI」，才会下载并校验 Ollama、准备推荐模型 `qwen3.5:4b`（模型约 3.4 GB）并显示进度。Ollama 运行时另需下载和存储空间，完整准备所需空间以页面提示为准；完成后可以离线使用。
 
@@ -59,7 +59,7 @@
 
 ### Mac 下载（Apple Silicon / Intel）
 
-从 [v0.2.0 发行页](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.2.0) 选择 `macos-arm64.zip`（M 系列芯片）或 `macos-x64.zip`（Intel）。完整解压后双击 `Start Writing Studio.command`，保留终端窗口；已附 Node.js，建议使用在线 AI。Mac 不支持自动准备本地模型。
+从 [v0.3.0 发行页](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.3.0) 选择 `macos-arm64.zip`（M 系列芯片）或 `macos-x64.zip`（Intel）。完整解压后双击 `Start Writing Studio.command`，保留终端窗口；已附 Node.js，建议使用在线 AI。Mac 不支持自动准备本地模型。
 
 包未签名或公证，macOS 可能要求在系统安全设置中确认打开。自动验证覆盖 macOS 启动和 HTTP，不等于用户真机、Safari 或 Gatekeeper 全覆盖。详见 [Mac 使用说明](scripts/macos/README.macos.zh-CN.md)。
 

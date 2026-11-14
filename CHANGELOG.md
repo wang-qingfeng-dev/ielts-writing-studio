@@ -4,7 +4,7 @@
 
 - **WorkBuddy 接入改成明说「测试中、部分账号可用」。** 这条路依赖 WorkBuddy 自己的本地网关，账号侧能不能放行不由本软件决定，继续承诺「点一次就一定能连上」只会让连不上的人以为是自己操作错了。现在下拉里写「WorkBuddy（测试中）」，面板上挂「测试中」标记，未连接时正文直接说明「只对部分账号开放，连不上不是你的问题」，主按钮从「一键连接」改成「尝试连接 WorkBuddy」，并且每个失败分支都同时给出「改用免费在线 AI」的出口；底部状态栏、分析失败、未登录等后端文案也一并对齐，不再出现「一键连接」这种做不到的承诺。
 
-- 已构建 Windows 便携包：`ielts-writing-studio-v0.4.3-windows-x64.zip`（39.7 MB，源提交 `0edeff9`，SHA256 `5582f28e10f83ab436f6f383d82cffb643f304533db8f08d38b3062636489287`）；解压实跑确认版本号 0.4.3、`/api/workbuddy` 返回 23 个模型、登录接口返回 `www.workbuddy.cn` 官方链接，启动脚本里的换版逻辑（`发现旧版本`）与精简产物环境变量（`CODEBUDDY_FORCE_LITE_WB_BUNDLE`）都已在包内。`setup.exe` 仍依赖 Inno Setup 6，本机未安装。
+- 已构建 Windows 便携包：`ielts-writing-studio-v0.4.3-windows-x64.zip`（39.7 MB，源提交 `59e5a03`，SHA256 `fa112bf9d9660d391c00f7927f7c98fb76b003797bf2931b80eb2db9e642a1d2`）；解压实跑确认版本号 0.4.3、`/api/workbuddy` 返回 23 个模型、登录接口返回 `www.workbuddy.cn` 官方链接，启动脚本里的换版逻辑（`发现旧版本`）与精简产物环境变量（`CODEBUDDY_FORCE_LITE_WB_BUNDLE`）都已在包内。`setup.exe` 仍依赖 Inno Setup 6，本机未安装。
 
 - 已发布到 GitHub Releases：<https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.4.3>，附带免安装版 zip、`.sha256` 与 `.manifest.json`。`setup.exe` 这次未附带：本机构建时安全删除策略拦下了安装器打包过程，安装版最新仍是 v0.3.0。
 

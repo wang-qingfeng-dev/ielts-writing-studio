@@ -4,7 +4,7 @@
 
 [简体中文](README.md) · [Download v0.4.3](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.4.3) · [Changelog](CHANGELOG.md)
 
-**v0.2.0** supports Task 1 and Task 2, DeepSeek, Doubao via Volcengine Ark and other compatible APIs. Use your own API key; no shared quota is included. Academic Task 1 requires chart/process/map information as text, not an image upload.
+**v0.4.3** supports Task 1 and Task 2, DeepSeek, Doubao via Volcengine Ark and other compatible APIs. Use your own API key; no shared quota is included. Academic Task 1 requires chart/process/map information as text, not an image upload.
 
 A local IELTS Writing Task 1 / Task 2 practice app that turns essay feedback into reusable learning cards. Compare your draft, a minimally corrected version, and an independently generated model essay, then practise the language you want to retain.
 
@@ -25,7 +25,7 @@ Click a highlight to see the source, revision, explanation and a short exercise.
 
 ### Windows one-click installer (recommended)
 
-Download the [Jujin v0.2.0 Windows x64 installer](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.2.0/ielts-writing-studio-v0.2.0-windows-x64-setup.exe). It includes Node.js and a Chinese setup wizard and needs no administrator permission.
+Download the [Jujin v0.3.0 Windows x64 installer](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.3.0/ielts-writing-studio-v0.3.0-windows-x64-setup.exe). It includes Node.js and a Chinese setup wizard and needs no administrator permission. The installer edition is currently v0.3.0; v0.4.x is available as the portable build.
 
 Older versions require this manual upgrade once. From v0.2.0 onward, the Windows x64 installer edition has **检查更新** at the bottom of the page: check, download, verify SHA-256, install and restart. Updates are user initiated. External AI settings/models and browser records at the same origin/port are retained. Portable/source/Mac editions link to manual downloads.
 

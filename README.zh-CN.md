@@ -6,6 +6,8 @@
 
 **v0.4.3** 支持 Task 1 学术类与培训类、Task 2，以及 DeepSeek、豆包（火山方舟）等在线接口。首次配置自己的 API 密钥，以后直接在应用内批改；不提供共享额度。
 
+> **当前版本说明：** 当前公开版本统一为 **v0.4.3**。`CHANGELOG`、历史验证记录和升级测试中的旧版本号只用于记录过去的发布或测试场景。v0.4.3 目前提供 Windows x64 免安装版；Windows 安装器和 macOS 包暂未重新构建为 v0.4.3。
+
 一个面向中文学习者的 IELTS Writing Task 1 / Task 2 本机学习工具。通过「我的原文 → 保留原意的精修 → 独立范文」三栏对照，把批改转化成可以复习、造句和迁移的学习卡片。
 
 **四项分数是 AI 练习估分，不是雅思官方成绩；不承诺提分，也不代表官方背书。**
@@ -34,11 +36,11 @@
 
 便携版已附带 Node.js，无需单独安装 Node。**不包含 AI 模型**：打开后可以立即体验标明为示例的完整教学内容；批改自己的作文还需要配置下方任意一种 AI 服务。此下载包适用于 Windows x64。
 
-### Windows：小白一键安装（推荐）
+### Windows：历史一键安装器（v0.3.0）
 
-下载 [句进 v0.3.0 一键安装程序](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.3.0/ielts-writing-studio-v0.3.0-windows-x64-setup.exe)，双击后按中文向导完成安装。安装程序自带 Node.js，不需要打开命令行；v0.4.x 目前提供免安装版。
+下载 [句进 v0.3.0 历史一键安装程序](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.3.0/ielts-writing-studio-v0.3.0-windows-x64-setup.exe)，双击后按中文向导完成安装。它自带 Node.js，不需要打开命令行，但不是当前 v0.4.3，功能可能落后。要使用当前公开版本，请下载上面的 v0.4.3 Windows 免安装版。
 
-**升级：** v0.1.2 及更早版本没有更新入口，请先关闭旧版并运行安装程序，安装到原目录。Windows x64 安装版可在页面底部点“检查更新”→“下载、安装并重启”。只在用户点击后联网和下载，校验 SHA-256 后安装；保留同一浏览器、地址和端口的学习记录，以及外部 AI 配置与模型。便携版、源码和 Mac 请下载新包。重要笔记建议先导出。
+**升级说明：** 这个历史安装器保留“检查更新”入口；v0.4.3 本次发布没有附带新的安装器，因此不能通过它把安装版直接升级成 v0.4.3。需要当前版本时，请关闭旧版并改用上面的 v0.4.3 免安装包。重要笔记建议先导出。
 
 首次启动先提供在线与本地两种选择，不会自动下载模型。只有点击「一键准备本地 AI」，才会下载并校验 Ollama、准备推荐模型 `qwen3.5:4b`（模型约 3.4 GB）并显示进度。Ollama 运行时另需下载和存储空间，完整准备所需空间以页面提示为准；完成后可以离线使用。
 
@@ -57,9 +59,9 @@
 
 在线批改不依赖本机运行大模型，但仍需要网络和服务商可用额度。连接测试只验证接口能返回基本格式，不保证每篇批改都会成功。自定义接口只接受 HTTPS；本机 localhost、127.0.0.1、::1 可使用 HTTP，并可按服务要求留空密钥。
 
-### Mac 下载（Apple Silicon / Intel）
+### Mac：当前版本暂未提供安装包
 
-从 [v0.3.0 发行页](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.3.0) 选择 `macos-arm64.zip`（M 系列芯片）或 `macos-x64.zip`（Intel）。完整解压后双击 `Start Writing Studio.command`，保留终端窗口；已附 Node.js，建议使用在线 AI。Mac 不支持自动准备本地模型。
+v0.4.3 发行页目前没有 macOS 资产。若只需要体验历史 Mac 包，可从 [v0.3.0 历史发行页](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.3.0) 选择 `macos-arm64.zip`（M 系列芯片）或 `macos-x64.zip`（Intel）；该包不是当前 v0.4.3，功能和页面可能落后。完整解压后双击 `Start Writing Studio.command`，保留终端窗口；已附 Node.js，建议使用在线 AI。Mac 不支持自动准备本地模型。
 
 包未签名或公证，macOS 可能要求在系统安全设置中确认打开。自动验证覆盖 macOS 启动和 HTTP，不等于用户真机、Safari 或 Gatekeeper 全覆盖。详见 [Mac 使用说明](scripts/macos/README.macos.zh-CN.md)。
 

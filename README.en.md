@@ -1,8 +1,10 @@
 # IELTS Writing Studio · 句进
 
-> v0.4.3 fixes the upgrade case where one-click connect answered with "接口不存在": the launcher now detects an older server still running in the background and swaps in the new build. The one-click WorkBuddy connection itself is unchanged: pick "WorkBuddy 账号" in the header, press the button, finish the official login page in your browser, and the panel flips to connected by itself — no terminal, no .cmd file, no typing /login. Once connected you can pick from 23 models in the same panel. The sentence-pattern practice from 0.4.1 is unchanged. Latest release: [v0.4.3](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.4.3) (portable Windows build); the installer is still v0.3.0.
+> v0.4.3 fixes the upgrade case where one-click connect answered with "接口不存在": the launcher now detects an older server still running in the background and swaps in the new build. The one-click WorkBuddy connection itself is unchanged: pick "WorkBuddy 账号" in the header, press the button, finish the official login page in your browser, and the panel flips to connected by itself — no terminal, no .cmd file, no typing /login. Once connected you can pick from 23 models in the same panel. The sentence-pattern practice from 0.4.1 is unchanged. Latest release: [v0.4.3](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.4.3) (portable Windows build); the installer and Mac packages remain historical assets.
 
 [简体中文](README.md) · [Download v0.4.3](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.4.3) · [Changelog](CHANGELOG.md)
+
+> **Current release:** v0.4.3 is the only current/public version. Older version numbers in the changelog, verification notes and upgrade tests are historical or test fixtures. The v0.4.3 release currently ships a Windows x64 portable build; the Windows installer and macOS packages have not been rebuilt for v0.4.3.
 
 **v0.4.3** supports Task 1 and Task 2, DeepSeek, Doubao via Volcengine Ark and other compatible APIs. Use your own API key; no shared quota is included. Academic Task 1 requires chart/process/map information as text, not an image upload.
 
@@ -23,11 +25,11 @@ Click a highlight to see the source, revision, explanation and a short exercise.
 
 ## Run locally
 
-### Windows one-click installer (recommended)
+### Historical Windows one-click installer (v0.3.0)
 
-Download the [Jujin v0.3.0 Windows x64 installer](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.3.0/ielts-writing-studio-v0.3.0-windows-x64-setup.exe). It includes Node.js and a Chinese setup wizard and needs no administrator permission. The installer edition is currently v0.3.0; v0.4.x is available as the portable build.
+Download the [historical Jujin v0.3.0 Windows x64 installer](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.3.0/ielts-writing-studio-v0.3.0-windows-x64-setup.exe). It includes Node.js and a Chinese setup wizard and needs no administrator permission, but it is not the current v0.4.3 and may have older features. Use the v0.4.3 portable build above for the current release.
 
-Older versions require this manual upgrade once. From v0.2.0 onward, the Windows x64 installer edition has **检查更新** at the bottom of the page: check, download, verify SHA-256, install and restart. Updates are user initiated. External AI settings/models and browser records at the same origin/port are retained. Portable/source/Mac editions link to manual downloads.
+The historical installer retains its **检查更新** entry, but v0.4.3 was published without a new installer asset, so it cannot upgrade an installed copy directly to the current release. Close the old app and use the v0.4.3 portable download when you need the current version.
 
 The first-run page offers a choice between online and local AI. It does not start a model download automatically. Clicking **一键准备本地 AI** explicitly starts Ollama download and verification, then prepares the recommended `qwen3.5:4b` model (approximately 3.4 GB). The Ollama runtime needs additional download and storage space; the setup page reports total requirements. Progress, retry and cancellation are available.
 
@@ -39,9 +41,9 @@ Existing installations can restore their previously installed model without a fo
 
 Download [ielts-writing-studio-v0.4.3-windows-x64.zip](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/download/v0.4.3/ielts-writing-studio-v0.4.3-windows-x64.zip), extract the entire archive, then double-click `Start Writing Studio.cmd`. Node.js is included; AI models are not.
 
-### Mac download
+### Mac: no current package yet
 
-Select macos-arm64 (Apple Silicon) or macos-x64 (Intel) on the release page. Extract fully and double-click `Start Writing Studio.command`; keep the terminal open. Node.js is included. Online AI is recommended; automatic local model preparation is Windows-only. Mac packages are unsigned and unnotarized; macOS may require confirmation in system security settings. CI covers the launcher and HTTP service, not real-user Gatekeeper/Safari or Mac AI inference.
+The v0.4.3 release currently has no macOS assets. For a historical Mac build only, select macos-arm64 (Apple Silicon) or macos-x64 (Intel) on the [v0.3.0 historical release page](https://github.com/wang-qingfeng-dev/ielts-writing-studio/releases/tag/v0.3.0). That package is not v0.4.3 and may have older features. Extract fully and double-click `Start Writing Studio.command`; keep the terminal open. Node.js is included. Online AI is recommended; automatic local model preparation is Windows-only. Mac packages are unsigned and unnotarized; macOS may require confirmation in system security settings.
 
 ### Run from source (Windows, macOS or Linux)
 

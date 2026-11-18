@@ -1,7 +1,7 @@
 ﻿param(
     [string]$SourceRef = 'main',
     [ValidatePattern('^v\d+\.\d+\.\d+$')]
-    [string]$ReleaseVersion = 'v0.2.0',
+    [string]$ReleaseVersion = 'v0.4.3',
     [ValidatePattern('^v24\.\d+\.\d+$')]
     [string]$NodeVersion = 'v24.19.0'
 )
